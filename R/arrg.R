@@ -34,7 +34,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                 match <- ore_search("^--(\\w+)(=(.*))?$", args[i])
                 opt <- subset(.opts, long==match[,1])
                 if (nrow(opt) != 1L)
-                    error(es("Unexpected long-style option: #{args[i]}"))
+                    stop(es("Unexpected long-style option: #{args[i]}"))
                 if (!is.na(match[,3])) {
                     if (!opt$arg)
                         stop(es("Long-style option --#{opt$long} does not take an argument"))
@@ -52,7 +52,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
             } else if (flags[i] == 1L) {
                 opt <- subset(.opts, short==ore_subst("^-","",args[i]))
                 if (nrow(opt) != 1L)
-                    error(es("Unexpected short-style option: #{args[i]}"))
+                    stop(es("Unexpected short-style option: #{args[i]}"))
                 name <- ifelse(is.na(opt$long), opt$short, opt$long)
                 if (opt$arg) {
                     if (i == nargs)
