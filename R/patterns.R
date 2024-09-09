@@ -13,7 +13,7 @@ resolvePattern <- function (spec, optInfo)
             if (is.null(m))
                 stop("Format of positional arguments is invalid")
             else
-                data.frame(name=m[,1], option=FALSE, multiple=!is.na(m[,2]), required=is.na(m[,3]))
+                data.frame(name=m[,1], format=m[,1], option=FALSE, multiple=!is.na(m[,2]), required=is.na(m[,3]))
         })
         argInfo <- do.call(rbind, argInfo)
         nargs <- nrow(argInfo)
@@ -29,13 +29,13 @@ resolvePattern <- function (spec, optInfo)
         for (i in seq_along(opts)) {
             if (validLongOpts[i]) {
                 index <- which(optInfo$long == longMatches[i,,1])
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2])))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=paste0("--",longMatches[i,,1]),option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2])))
             } else {
                 shortMatches <- ore_search("(\\w)(!)?", opts[i], all=TRUE)
                 if (!all(shortMatches[,1] %in% optInfo$short))
                     stop("Pattern uses options not included in the main specification")
                 indices <- match(shortMatches[,1], optInfo$short)
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2])))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=paste0("-",shortMatches[,1]), option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2])))
             }
         }
     }
@@ -78,4 +78,19 @@ matchPattern <- function (pattern, parsed)
     }
     
     return (result)
+}
+
+formatPattern <- function (pattern, name)
+{
+    elements <- name
+    
+    opts <- subset(pattern, option)
+    if (nrow(opts) > 0)
+        elements <- c(elements, ifelse(opts$required, opts$format, paste0("[",opts$format,"]")))
+    
+    args <- subset(pattern, !option)
+    if (nrow(args) > 0)
+        elements <- c(elements, paste0(ifelse(args$required,"<","[<"), args$format, ">", ifelse(args$multiple,"...",""), ifelse(args$required,"","]")))
+    
+    paste(elements, collapse=" ")
 }
