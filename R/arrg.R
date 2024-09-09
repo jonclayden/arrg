@@ -82,7 +82,8 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         return (patternMatches[[which(validPatterns)[1]]])
     }, show = function (width = getOption("width")) {
         wrap(header, width)
-        
+        for (pattern in .pats)
+            wrap(formatPattern(pattern, name), width)
         wrap(footer, width)
     })
 }
