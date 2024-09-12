@@ -17,7 +17,6 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
 {
     .opts <- rbind(...)
     .pats <- lapply(patterns, resolvePattern, .opts)
-    print(.opts)
     list(parse = function (args = commandArgs(trailingOnly=TRUE)) {
         args <- expandArgs(args, .opts$short)
         flags <- as.integer(ore_switch(args, "^--"="2", "^-"="1", "0"))
@@ -75,7 +74,6 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         
         patternMatches <- lapply(.pats, matchPattern, result)
         validPatterns <- !sapply(patternMatches, is.null)
-        print(validPatterns)
         if (!any(validPatterns))
             stop("Provided arguments do not match any usage pattern")
         

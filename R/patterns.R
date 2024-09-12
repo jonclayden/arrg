@@ -42,7 +42,6 @@ resolvePattern <- function (spec, optInfo)
         }
     }
     
-    print(argInfo)
     return(argInfo)
 }
 
