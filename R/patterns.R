@@ -29,13 +29,15 @@ resolvePattern <- function (spec, optInfo)
         for (i in seq_along(opts)) {
             if (validLongOpts[i]) {
                 index <- which(optInfo$long == longMatches[i,,1])
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=paste0("--",longMatches[i,,1]),option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2])))
+                format <- paste0("--", longMatches[i,,1], ifelse(optInfo$arg[index], paste0("=<",optInfo$argname[index],">"), ""))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=format, option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2])))
             } else {
                 shortMatches <- ore_search("(\\w)(!)?", opts[i], all=TRUE)
                 if (!all(shortMatches[,1] %in% optInfo$short))
                     stop("Pattern uses options not included in the main specification")
                 indices <- match(shortMatches[,1], optInfo$short)
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=paste0("-",shortMatches[,1]), option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2])))
+                formats <- paste0("-", shortMatches[,1], ifelse(optInfo$arg[indices], paste0(" <",optInfo$argname[indices],">"), ""))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=formats, option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2])))
             }
         }
     }
