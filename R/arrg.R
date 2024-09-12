@@ -87,7 +87,24 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
             lines <- c(lines, strwrap(header, width), "")
         if (length(.pats) > 0) {
             nameWidth <- nchar(name, "width")
-            lines <- c(lines, "Usage:", sapply(.pats, function(p) strwrap(paste(name, formatPattern(p)), indent=2L, exdent=3L+nameWidth)), "")
+            lines <- c(lines, "Usage:", sapply(.pats, function(p) strwrap(paste(name, formatPattern(p)), width, indent=2L, exdent=3L+nameWidth)), "")
+        }
+        if (nrow(.opts) > 0) {
+            shortStrings <- ifelse(is.na(.opts$short), NA, paste0("-", .opts$short, ifelse(.opts$arg, paste0(" <",.opts$argname,">"), "")))
+            longStrings <- ifelse(is.na(.opts$short), NA, paste0("--", .opts$long, ifelse(.opts$arg, paste0("=<",.opts$argname,">"), "")))
+            both <- !is.na(shortStrings) & !is.na(longStrings)
+            optStrings <- ifelse(both, paste(shortStrings,longStrings,sep=", "), ifelse(is.na(shortStrings), longStrings, shortStrings))
+            optWidths <- nchar(optStrings, "width")
+            maxWidth <- max(optWidths)
+            
+            lines <- c(lines, "Options:")
+            for (i in seq_len(nrow(.opts))) {
+                descLines <- strwrap(.opts$description[i], width-maxWidth-5)
+                lines <- c(lines, paste0("  ", optStrings[i], strrep(" ", maxWidth+3-optWidths[i]), descLines[1]))
+                if (length(descLines) > 1)
+                    lines <- c(lines, paste0(strrep(" ", 5+maxWidth), descLines[-1]))
+            }
+            lines <- c(lines, "")
         }
         if (!is.null(footer))
             lines <- c(lines, strwrap(footer, width), "")
