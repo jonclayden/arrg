@@ -81,9 +81,17 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         
         return (patternMatches[[which(validPatterns)[1]]])
     }, show = function (width = getOption("width")) {
-        wrap(header, width)
-        for (pattern in .pats)
-            wrap(formatPattern(pattern, name), width)
-        wrap(footer, width)
+        lines <- character(0)
+        
+        if (!is.null(header))
+            lines <- c(lines, strwrap(header, width), "")
+        if (length(.pats) > 0) {
+            nameWidth <- nchar(name, "width")
+            lines <- c(lines, "Usage:", sapply(.pats, function(p) strwrap(paste(name, formatPattern(p)), indent=2L, exdent=3L+nameWidth)), "")
+        }
+        if (!is.null(footer))
+            lines <- c(lines, strwrap(footer, width), "")
+        
+        cat(lines, sep="\n")
     })
 }
