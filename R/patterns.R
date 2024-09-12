@@ -80,9 +80,9 @@ matchPattern <- function (pattern, parsed)
     return (result)
 }
 
-formatPattern <- function (pattern, name)
+formatPattern <- function (pattern)
 {
-    elements <- name
+    elements <- character(0)
     
     opts <- subset(pattern, option)
     if (nrow(opts) > 0)
