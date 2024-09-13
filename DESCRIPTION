@@ -4,7 +4,7 @@ Date: 2024-09-06
 Title: Flexible Argument Parsing for R Scripts
 Authors@R: person("Jon", "Clayden", role=c("cre","aut"), email="code@clayden.org", comment=c(ORCID="0000-0002-6608-0619"))
 Imports: ore
-Suggests: tinytest
+Suggests: tinytest, covr
 Description: The tractor.nt package provides a reference implementation for white matter segmentation with neighbourhood tractography (NT). Functions for performing both heuristic and model-based NT are included.
 Encoding: UTF-8
 License: GPL-2
