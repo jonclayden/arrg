@@ -23,7 +23,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         nargs <- length(args)
         
         i <- 1
-        result <- structure(mapply("%as%", .opts$default, .opts$mode, SIMPLIFY=FALSE), names=.opts$name)
+        result <- list()
         repeat {
             if (i > nargs) break
             else if (args[i] == "--") {
@@ -72,7 +72,8 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         else
             result[[".args"]] <- character(0)
         
-        patternMatches <- lapply(.pats, matchPattern, result)
+        defaults <- structure(mapply("%as%", .opts$default, .opts$mode, SIMPLIFY=FALSE), names=.opts$name)
+        patternMatches <- lapply(.pats, matchPattern, result, defaults)
         validPatterns <- !sapply(patternMatches, is.null)
         if (!any(validPatterns))
             stop("Provided arguments do not match any usage pattern")

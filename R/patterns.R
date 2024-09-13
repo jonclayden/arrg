@@ -45,9 +45,13 @@ resolvePattern <- function (spec, optInfo)
     return(argInfo)
 }
 
-matchPattern <- function (pattern, parsed)
+matchPattern <- function (pattern, parsed, defaults)
 {
     result <- list()
+    
+    parsedOptionNames <- setdiff(names(parsed), ".args")
+    if (!all(parsedOptionNames %in% pattern$name))
+        return (NULL)   # Unexpected option
     
     args <- subset(pattern, !option)
     nargs <- nrow(args)
@@ -71,10 +75,12 @@ matchPattern <- function (pattern, parsed)
     if (nopts > 0) {
         for (i in seq_len(nopts)) {
             name <- opts$name[i]
-            if (opts$required[i] && (is.null(parsed[[name]]) || identical(parsed[[name]],FALSE)))
+            if (opts$required[i] && is.null(parsed[[name]]))
                 return (NULL)   # Required option missing
             else if (!is.null(parsed[[name]]))
                 result[[name]] <- parsed[[name]]
+            else if (!is.null(defaults[[name]]))
+                result[[name]] <- defaults[[name]]
         }
     }
     
