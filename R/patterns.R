@@ -71,7 +71,7 @@ matchPattern <- function (pattern, parsed)
     if (nopts > 0) {
         for (i in seq_len(nopts)) {
             name <- opts$name[i]
-            if (is.null(parsed[[name]]) && opts$required[i])
+            if (opts$required[i] && (is.null(parsed[[name]]) || identical(parsed[[name]],FALSE)))
                 return (NULL)   # Required option missing
             else if (!is.null(parsed[[name]]))
                 result[[name]] <- parsed[[name]]
