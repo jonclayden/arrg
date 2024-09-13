@@ -3,9 +3,9 @@ args <- arrg("test",
              opt("n|times", "Run test the specifed number of times", arg="count", default=1L),
              opt("t|time", "Print the overall run-time once the test is completed"),
              opt("install", "Install the code before testing it"),
-             patterns=list(pat("path?", options="n,t,install"),
+             patterns=list(pat(options="h!"),
                            pat("command", "arg...?", options="nt"),
-                           pat(options="h!")),
+                           pat("path?", options="n,t,install")),
              header="Test your code",
              footer="Run the test on the code at the specified path (default \".\"), or run a specific command.")
 
