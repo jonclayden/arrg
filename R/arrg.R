@@ -55,9 +55,9 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                 name <- ifelse(is.na(opt$long), opt$short, opt$long)
                 if (opt$arg) {
                     if (i == nargs)
-                        stop(es("Short-style option --#{opt$short} requires an argument"))
+                        stop(es("Short-style option -#{opt$short} requires an argument"))
                     else if (flags[i+1] > 0L)
-                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option --#{opt$short}"))
+                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option -#{opt$short}"))
                     result[[name]] <- args[i+1] %as% opt$mode
                     i <- i + 1
                 } else {
