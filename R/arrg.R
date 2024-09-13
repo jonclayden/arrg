@@ -89,7 +89,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         }
         if (nrow(.opts) > 0) {
             shortStrings <- ifelse(is.na(.opts$short), NA, paste0("-", .opts$short, ifelse(.opts$arg, paste0(" <",.opts$argname,">"), "")))
-            longStrings <- ifelse(is.na(.opts$short), NA, paste0("--", .opts$long, ifelse(.opts$arg, paste0("=<",.opts$argname,">"), "")))
+            longStrings <- ifelse(is.na(.opts$long), NA, paste0("--", .opts$long, ifelse(.opts$arg, paste0("=<",.opts$argname,">"), "")))
             both <- !is.na(shortStrings) & !is.na(longStrings)
             optStrings <- ifelse(both, paste(shortStrings,longStrings,sep=", "), ifelse(is.na(shortStrings), longStrings, shortStrings))
             optWidths <- nchar(optStrings, "width")
