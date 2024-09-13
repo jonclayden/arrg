@@ -12,7 +12,7 @@ args <- arrg("test",
 expect_stdout(args$show(), "usage")
 
 p1 <- args$parse("-h")
-p2 <- args$parse(c("-tn3", "--install", "."))
+p2 <- args$parse(c("-tn3", "--install", "."))       # NB: --install flag is the only thing that marks this as the third pattern not the second
 p3 <- args$parse(c("-t", "mycommand", "one", "two"))
 
 expect_true(p1$help)
