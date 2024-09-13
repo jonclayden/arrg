@@ -25,6 +25,13 @@ expect_true(p3$time)
 expect_equal(p3$command, "mycommand")
 expect_equal(p3$arg, c("one","two"))
 
+# Specification errors: bad options, syntax errors, too many variable-length arguments
+expect_error(arrg("test", opt("h")), "description")
+expect_error(arrg("test", opt("h|help|he", "empty")), "too many labels")
+expect_error(arrg("test", patterns=list(pat(options="h"))), "options")
+expect_error(arrg("test", patterns=list(pat("command!"))), "Format")
+expect_error(arrg("test", patterns=list(pat("source...", "target..."))), "multiple values")
+
 # Usage errors: non-existent options, missing arguments, ambiguity
 expect_error(args$parse("-i"), "Unexpected")
 expect_error(args$parse("--error"), "Unexpected")
