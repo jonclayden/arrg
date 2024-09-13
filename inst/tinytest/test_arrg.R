@@ -24,3 +24,12 @@ expect_equal(p2$path, ".")
 expect_true(p3$time)
 expect_equal(p3$command, "mycommand")
 expect_equal(p3$arg, c("one","two"))
+
+# Usage errors: non-existent options, missing arguments, ambiguity
+expect_error(args$parse("-i"), "Unexpected")
+expect_error(args$parse("--error"), "Unexpected")
+expect_error(args$parse("-n"), "argument")
+expect_error(args$parse("--times"), "argument")
+expect_error(args$parse("--time=yes"), "argument")
+expect_warning(args$parse(c("-n", "-3")), "parameter")
+expect_error(args$parse(c("-h", "-t")), "pattern")
