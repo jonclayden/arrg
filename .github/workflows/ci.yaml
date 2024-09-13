@@ -56,3 +56,5 @@ jobs:
     - name: Update test coverage
       if: runner.os == 'Linux'
       run: Rscript -e 'covr::codecov()'
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
