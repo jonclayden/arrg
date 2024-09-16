@@ -1,7 +1,7 @@
 args <- arrg("test",
-             opt("h|help", "Display this usage information and exit"),
-             opt("n|times", "Run test the specifed number of times", arg="count", default=1L),
-             opt("t|time", "Print the overall run-time once the test is completed"),
+             opt("h,help", "Display this usage information and exit"),
+             opt("n,times", "Run test the specifed number of times", arg="count", default=1L),
+             opt("t,time", "Print the overall run-time once the test is completed"),
              opt("install", "Install the code before testing it"),
              patterns=list(pat(options="h!"),
                            pat("command", "arg...?", options="nt"),
@@ -27,7 +27,7 @@ expect_equal(p3$arg, c("one","two"))
 
 # Specification errors: bad options, syntax errors, too many variable-length arguments
 expect_error(arrg("test", opt("h")), "description")
-expect_error(arrg("test", opt("h|help|he", "empty")), "too many labels")
+expect_error(arrg("test", opt("h,help,he", "empty")), "too many labels")
 expect_error(arrg("test", patterns=list(pat(options="h"))), "options")
 expect_error(arrg("test", patterns=list(pat("command!"))), "Format")
 expect_error(arrg("test", patterns=list(pat("source...", "target..."))), "multiple values")

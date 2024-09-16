@@ -1,6 +1,6 @@
 opt <- function (label, description, arg = FALSE, default = NA_character_)
 {
-    label <- ore_split(ore("|",syntax="fixed"), label)
+    label <- ore_split(ore(",",syntax="fixed"), label)
     shortForm <- label %~% "^-?\\w$"
     if (length(label) == 0L || sum(shortForm) > 1L || sum(!shortForm) > 1L)
         stop("Too few or too many labels for option")
