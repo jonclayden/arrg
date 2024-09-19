@@ -1,14 +1,15 @@
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(collapse=TRUE)
+options(width=70)
 ```
 
 # arrg: Flexible argument parsing for R scripts
 
 [R](https://www.r-project.org) is a scripting language. While often used interactively in exploratory data science, or run batch-style to replicate a previous analysis, the language can also be used for shell-like scripting at a command line. This usage is supported by the `Rscript` binary provided with R, and by [the `littler` project](https://github.com/eddelbuettel/littler), but parsing script arguments requires additional effort.
 
-There are several R packages available to provide option and argument parsing, and choosing between them is largely a matter of taste. [`docopt`](http://docopt.org) is cute, and [available for R](https://cran.r-project.org/package=docopt) thanks to Edwin de Jonge, but I find [some of its heuristics strange](https://mastodon.online/@jonclayden/112213538389204350) and that puts me off. Also available on CRAN are [`argparse`](https://CRAN.R-project.org/package=argparse), [`argparser`](https://CRAN.R-project.org/package=argparser), [`batch`](https://CRAN.R-project.org/package=batch), [`defineOptions`](https://cran.r-project.org/package=defineOptions), [`getopt`](https://cran.r-project.org/package=getopt), [`GetoptLong`](https://cran.r-project.org/package=GetoptLong), [`optparse`](https://cran.r-project.org/package=optparse) and [`scribe`](https://cran.r-project.org/package=scribe).
+There are several R packages available to provide option and argument parsing, and choosing between them is largely a matter of taste. [`docopt`](http://docopt.org) is cute, and [available for R](https://cran.r-project.org/package=docopt) thanks to Edwin de Jonge, but I find [some of its heuristics strange](https://mastodon.online/@jonclayden/112213538389204350) and that puts me off. Also available on CRAN are [`argparse`](https://CRAN.R-project.org/package=argparse), [`argparser`](https://CRAN.R-project.org/package=argparser), [`batch`](https://CRAN.R-project.org/package=batch), [`defineOptions`](https://cran.r-project.org/package=defineOptions), [`getopt`](https://cran.r-project.org/package=getopt), [`GetoptLong`](https://cran.r-project.org/package=GetoptLong), [`optigrab`](https://cran.r-project.org/package=optigrab), [`optparse`](https://cran.r-project.org/package=optparse) and [`scribe`](https://cran.r-project.org/package=scribe), so there's no shortage of options.
 
-But none of these suited me, because I'm picky, so I wrote my own.
+But none of these suited me, [because I'm picky](#why-arrg), so I wrote my own.
 
 ## Installation and status
 
@@ -57,8 +58,36 @@ Some options take an argument, like the `-n` or `--times` option above. In that 
 
 Patterns give mutually exclusive ways in which the command may be used, and will be displayed separately in the usage information. Here, we have one pattern that requires the `-h` (or `--help`) option, as the exclamation mark indicates. The second pattern accepts a subcommand and possible arguments (the ellipsis, `...`, indicates one or more values, and the question mark, `?`, that the argument is optional), and accepts the `-n` and `-t` options. The third takes an optional path and accepts the `-n`, `-t` and `--install` options.
 
-This is all made explicit to the user in the usage information, which can be shown using the `show()` method:
+This is all made explicit to the user in the usage information, which can be shown using the `show()` method. This is also where the `header` and `footer` arguments above come in, as they're shown before and after the usage and option summary:
 
 ```{r}
 parser$show()
 ```
+
+Note that the text blocks are wrapped neatly, each pattern is shown separately, optional arguments are surrounded by square brackets, argument names are used in appropriate places, and so on.
+
+## Parsing arguments
+
+The `parse()` method then does the actual parse. By default it takes script arguments from the result of `commandArgs(trailingOnly=TRUE)`, but arguments can also be specified explicitly. (We would use `argv` for `littler`.)
+
+```{r}
+parser$parse("-h")
+```
+
+The result is a list with the valid arguments included, keyed by their argument names, long option labels or short option labels, in that order of preference. Note that `-h` is a flag, so its value is a Boolean (`TRUE`/`FALSE`) value. In practice this form would prompt us to `show()` the usage information above. A more interesting example could be
+
+```{r}
+parser$parse(c("-tn3", "--install", "."))
+```
+
+Here, we're using the third pattern, which `arrg` distinguishes from the second by the presence of the `--install` option, which the second pattern doesn't accept. Note that `-tn3` combines the `-t` option with the `-n` option and its argument, which is a common space-saving syntax that `arrg` supports; and that the argument to the `-n` (times) option gets converted to integer mode automatically to match the default value.
+
+The script can now use the parsed argument list to implement its core functionality.
+
+## Why `arrg`?
+
+OK, so why might you want to use `arrg` in preference to one of the many alternatives for R? As I stated at the outset, this is largely a question of taste, but here are my reasons.
+
+For a fairly basic piece of functionality like this, portability is important to me, and that means that I want dependencies to be minimal, especially outside the R ecosystem. That excludes the `argparse` package, which requires Python, and `GetoptLong`, which requires Perl.
+
+Package `batch` doesn't use Unix-style options, but rather an argument list of alternating variable names and values which are interpreted as R expressions. It's an neat and simple solution, but a little verbose to use in my opinion, especially for simple on/off flags.
