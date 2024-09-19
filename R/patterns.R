@@ -1,3 +1,38 @@
+#' Specify a usage pattern
+#' 
+#' This function is used to specify a valid usage pattern for the command,
+#' which may be one of a number of mutually exclusive patterns available. Its
+#' return value is generally passed to [arrg()].
+#' 
+#' When parsing arguments, patterns are tried in the order specified, and the
+#' first valid pattern will be chosen. A pattern will be considered a valid
+#' match if all required options and positional arguments have been specified,
+#' and no unexpected options are included.
+#' 
+#' @param ... Character strings naming positional arguments, if any are valid.
+#'   Positional arguments are required by default; if not required they should
+#'   be followed by a question mark. The final positional argument (only) may
+#'   take multiple values, in which case it should contain an ellipsis (...),
+#'   before the question mark if the argument is also optional.
+#' @param options A string naming the long or short labels of options that can
+#'   be specified with this pattern, comma-separated. Short form options may be
+#'   given in one letter cluster for convenience. Options are only required if
+#'   followed by an exclamation mark.
+#' @return A list capturing the positional arguments, with options in an
+#'   attribute. This will not usually be used directly, but passed to [arrg()].
+#' @seealso [arrg()]
+#' 
+#' @examples
+#'   # A pattern with no positional arguments, but requiring the -h flag
+#'   pat(options="h!")
+#'   
+#'   # A pattern that takes a command and variable number of arguments, and
+#'   # accepts the -n and -t options (note the latter are specified in cluster
+#'   # form, but "n,t" is also valid) 
+#'   pat("command", "arg...?", options="nt")
+#' 
+#' @author Jon Clayden
+#' @export
 pat <- function (..., options = NULL)
 {
     return (structure(list(...), options=options))

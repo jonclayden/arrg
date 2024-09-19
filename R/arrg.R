@@ -13,6 +13,41 @@ expandArgs <- function (args, validShort)
     return (result)
 }
 
+#' Create an argument parser
+#' 
+#' This function creates an argument parser that handles the specified options
+#' and usage patterns. To parse arguments or display usage information, the
+#' methods \code{parse} or \code{show} contained in the return value should be
+#' called.
+#' 
+#' @param name The name of the command.
+#' @param ... Option specifications. See [opt()] for details.
+#' @param patterns A list of usage patterns that are valid for the command,
+#'   each specifying acceptable options and positional arguments. See [pat()]
+#'   for details.
+#' @param header,footer Optional paragraphs of text to be prepended and/or
+#'   appended to the usage text produced by the `show` method of the return
+#'   value. Typically used to introduce the command or give brief guidance on
+#'   usage.
+#' @return A list with function elements
+#' * `parse(args)`: Parse the character vector of arguments passed in, or by
+#'   default, the value of `commandArgs(trailingOnly=TRUE)`.
+#' * `show(width)`: Print a usage summary, detailing the valid options and
+#'   patterns. Text will be wrapped to the specified width, which defaults to
+#'   the value of the `width` option.
+#' @seealso [opt()], [pat()]
+#' 
+#' @examples
+#'   # A simple parser for a command called "test" with only one option, -h
+#'   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(options="h!")))
+#'   
+#'   # Print out usage information
+#'   p$show()
+#'   
+#'   # Parse the option
+#'   p$parse("-h")
+#' @author Jon Clayden
+#' @export
 arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
 {
     .opts <- rbind(...)

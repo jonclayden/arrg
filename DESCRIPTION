@@ -1,6 +1,6 @@
 Package: arrg
 Version: 0.1.0
-Date: 2024-09-06
+Date: 2024-09-19
 Title: Flexible Argument Parsing for R Scripts
 Authors@R: person("Jon", "Clayden", role=c("cre","aut"), email="code@clayden.org", comment=c(ORCID="0000-0002-6608-0619"))
 Imports: ore
@@ -10,3 +10,5 @@ Encoding: UTF-8
 License: GPL-2
 URL: https://github.com/jonclayden/arrg
 BugReports: https://github.com/jonclayden/arrg/issues
+RoxygenNote: 7.3.2
+Roxygen: list(markdown = TRUE)
