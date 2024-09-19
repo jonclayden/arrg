@@ -33,15 +33,16 @@ Here's an example.
 library(arrg)
 
 parser <- arrg("test",
- 			   opt("h,help", "Display this usage information and exit"),
- 			   opt("n,times", "Run test the specifed number of times", arg="count", default=1L),
- 			   opt("t,time", "Print the overall run-time once the test is completed"),
- 			   opt("install", "Install the code before testing it"),
- 			   patterns=list(pat(options="h!"),
-			   			     pat("command", "arg...?", options="nt"),
-			     		     pat("path?", options="n,t,install")),
- 			   header="Test your code",
- 			   footer="Run the test on the code at the specified path (default \".\"), or run a specific command.")
+    opt("h,help", "Display this usage information and exit"),
+    opt("n,times", "Run test the specifed number of times", arg="count", default=1L),
+    opt("t,time", "Print the overall run-time once the test is completed"),
+    opt("install", "Install the code before testing it"),
+    patterns=list(
+        pat(options="h!"),
+        pat("command", "arg...?", options="nt"),
+        pat("path?", options="n,t,install")),
+    header="Test your code",
+    footer="Run the test on the code at the specified path (default \".\"), or run a specific command.")
 ```
 
 There's quite a lot going on here, so let's take it a bit at a time.
