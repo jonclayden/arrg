@@ -88,7 +88,7 @@ matchPattern <- function (pattern, parsed, defaults)
     if (!all(parsedOptionNames %in% pattern$name))
         return (NULL)   # Unexpected option
     
-    args <- subset(pattern, !option)
+    args <- subset(pattern, !pattern$option)
     nargs <- nrow(args)
     if (nargs > 0) {
         npargs <- length(parsed$.args)
@@ -105,7 +105,7 @@ matchPattern <- function (pattern, parsed, defaults)
         }
     }
     
-    opts <- subset(pattern, option)
+    opts <- subset(pattern, pattern$option)
     nopts <- nrow(opts)
     if (nopts > 0) {
         for (i in seq_len(nopts)) {
@@ -126,11 +126,11 @@ formatPattern <- function (pattern)
 {
     elements <- character(0)
     
-    opts <- subset(pattern, option)
+    opts <- subset(pattern, pattern$option)
     if (nrow(opts) > 0)
         elements <- c(elements, ifelse(opts$required, opts$format, paste0("[",opts$format,"]")))
     
-    args <- subset(pattern, !option)
+    args <- subset(pattern, !pattern$option)
     if (nrow(args) > 0)
         elements <- c(elements, paste0(ifelse(args$required,"<","[<"), args$format, ">", ifelse(args$multiple,"...",""), ifelse(args$required,"","]")))
     

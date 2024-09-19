@@ -66,7 +66,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                 break
             } else if (flags[i] == 2L) {
                 match <- ore_search("^--(\\w+)(=(.*))?$", args[i])
-                opt <- subset(.opts, long==match[,1])
+                opt <- subset(.opts, .opts$long==match[,1])
                 if (nrow(opt) != 1L)
                     stop(es("Unexpected long-style option: #{args[i]}"))
                 if (!is.na(match[,3])) {
@@ -84,7 +84,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                     result[[opt$long]] <- TRUE
                 }
             } else if (flags[i] == 1L) {
-                opt <- subset(.opts, short==ore_subst("^-","",args[i]))
+                opt <- subset(.opts, .opts$short==ore_subst("^-","",args[i]))
                 if (nrow(opt) != 1L)
                     stop(es("Unexpected short-style option: #{args[i]}"))
                 name <- ifelse(is.na(opt$long), opt$short, opt$long)
