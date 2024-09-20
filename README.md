@@ -122,4 +122,311 @@ OK, so why might you want to use `arrg` in preference to one of the many alterna
 
 For a fairly basic piece of functionality like this, portability is important to me, and that means that I want dependencies to be minimal, especially outside the R ecosystem. That excludes the `argparse` package, which requires Python, and `GetoptLong`, which requires Perl.
 
-Package `batch` doesn't use Unix-style options, but rather an argument list of alternating variable names and values which are interpreted as R expressions. It's an neat and simple solution, but a little verbose to use in my opinion, especially for simple on/off flags.
+Package `batch` doesn't use Unix-style options, but rather an argument list of alternating variable names and values which are interpreted as R expressions. It's an neat and simple solution, but a little verbose to use in my opinion, especially for simple on/off flags. `getopt` is very bare-bones, and is essentially subsumed by `optparse`. I couldn't get `defineOptions` to work as expected using the documentation.
+
+That still leaves various alternatives. `docopt` is a solid option if its heuristics work for you. Indeed, it parses `arrg`'s help string correctly for the test case above:
+
+
+``` r
+# Write the usage help output to a character vector
+parser$show(textConnection("help", "w"))
+
+docopt::docopt(paste(help,collapse="\n"), c("-tn3", "--install", "."))
+## List of 16
+##  $ --help   : logi FALSE
+##  $ --times  : chr "3"
+##  $ --time   : logi TRUE
+##  $ --install: logi TRUE
+##  $ <command>: NULL
+##  $ <arg>    : list()
+##  $ <path>   : chr "."
+##  $ is       : logi FALSE
+##  $ completed: logi FALSE
+##  $ help     : logi FALSE
+##  $ times    : chr "3"
+##  $ time     : logi TRUE
+##  $ install  : logi TRUE
+##  $ command  : NULL
+##  $ arg      : list()
+##  $ path     : chr "."
+## NULL
+```
+
+Here's an implementation with `argparser`:
+
+
+``` r
+library(argparser)
+
+ap.parser <- arg_parser("Test your code", "test", TRUE) |>
+    add_argument("--times", "Run test the specifed number of times", default=1L, short="-n") |>
+    add_argument("--time", "Print the overall run-time once the test is completed", flag=TRUE) |>
+    add_argument("--install", "Install the code before testing it", flag=TRUE) |>
+    add_argument("command", "Command to run or path to code")
+
+# print(ap.parser)
+# parse_args(ap.parser, "-h")
+# parse_args(ap.parser, c("-tn3", "--install", "."))
+```
+
+This does a pretty good job, but it writes its output to `stderr`, which doesn't show up here. (This is why the action lines at the end are commented out.) There are some other limitations which make it nonequivalent to the `arrg` version: the help option doesn't allow any customisation, it doesn't seem to be possible to have a variable number of positional arguments, options can't only have a long 
+
+Next up is `defineOptions`.
+
+
+``` r
+library(defineOptions)
+
+do.parser <- new_parser_def() |>
+    define_option(list(def_name="help", def_type="logical", short_option="-h", long_option="--help", callback=opt_optional_input_disallowed(TRUE, FALSE))) |>
+    define_option(list(def_name="times", def_type="integer", short_option="-n", long_option="--times", callback=opt_optional_input_required(1L))) |>
+    define_option(list(def_name="time", def_type="logical", short_option="-t", long_option="--time", callback=opt_optional_input_disallowed(TRUE, FALSE))) |>
+    define_option(list(def_name="install", def_type="logical", long_option="--install", callback=opt_optional_input_disallowed(TRUE, FALSE)))
+
+parse_with_defs(do.parser, "-h")
+## $values
+## $values$help
+## [1] FALSE
+## 
+## $values$times
+## [1] 1
+## 
+## $values$time
+## [1] FALSE
+## 
+## $values$install
+## [1] FALSE
+## 
+## 
+## $opt_specified
+## $opt_specified$help
+## [1] FALSE
+## 
+## $opt_specified$times
+## [1] FALSE
+## 
+## $opt_specified$time
+## [1] FALSE
+## 
+## $opt_specified$install
+## [1] FALSE
+## 
+## 
+## $positional
+## [1] "-h"
+## 
+## attr(,"class")
+## [1] "parsed_result"
+```
+
+``` r
+parse_with_defs(do.parser, c("-tn3", "--install", "."))
+## undefined option specified: -tn3
+## Error in parse_with_defs(do.parser, c("-tn3", "--install", ".")):
+```
+
+This doesn't seem to work. Now, `optigrab`, which doesn't use a parser object but instead 
+
+
+``` r
+library(optigrab)
+
+opts <- c("-t", "-n", "3", "--install", ".")
+
+list(help=opt_get(c("h","help"), FALSE, description="Display this usage information and exit", opts=opts),
+    times=opt_get(c("n","times"), 1L, description="Run test the specifed number of times", opts=opts),
+    time=opt_get(c("t","time"), FALSE, description="Print the overall run-time once the test is completed", opts=opts),
+    install=opt_get("install", FALSE, description="Install the code before testing it", opts=opts),
+    opt_get_verb(opts=opts))
+## $help
+## [1] FALSE
+## 
+## $times
+## [1] 3
+## 
+## $time
+## [1] TRUE
+## 
+## $install
+## [1] TRUE
+## 
+## [[5]]
+## [1] "."
+```
+
+``` r
+
+opt_help()
+## [1] FALSE
+```
+
+Now `optparse`:
+
+
+``` r
+library(optparse)
+
+op.parser <- OptionParser(prog="test",
+    usage=c("\n  %prog -h\n  %prog [-n <count>] [-t] <command> [<arg>...]\n  %prog [-n <count>] [-t] [--install] [<path>]"),
+    add_help_option=FALSE,
+    description="Test your code",
+    epilogue="Run the test on the code at the specified path (default \".\"), or run a specific command.") |>
+    add_option(c("-h","--help"), "store_true", help="Display this usage information and exit") |>
+    add_option(c("-n","--times"), "store", default=1L, help="Run test the specifed number of times") |>
+    add_option(c("-t","--time"), "store_true", help="Print the overall run-time once the test is completed") |>
+    add_option("--install", "store_true", help="Install the code before testing it")
+
+print_help(op.parser)
+## Usage: 
+##   test -h
+##   test [-n <count>] [-t] <command> [<arg>...]
+##   test [-n <count>] [-t] [--install] [<path>]
+## Test your code
+## 
+## Options:
+## 	-h, --help
+## 		Display this usage information and exit
+## 
+## 	-n TIMES, --times=TIMES
+## 		Run test the specifed number of times
+## 
+## 	-t, --time
+## 		Print the overall run-time once the test is completed
+## 
+## 	--install
+## 		Install the code before testing it
+## 
+## Run the test on the code at the specified path (default "."), or run a specific command.
+```
+
+``` r
+parse_args(op.parser, "-h", print_help_and_exit=FALSE, positional_arguments=TRUE)
+## $options
+## $options$help
+## [1] TRUE
+## 
+## $options$times
+## [1] 1
+## 
+## 
+## $args
+## character(0)
+```
+
+``` r
+parse_args(op.parser, c("-t", "-n", "3", "--install", "."), print_help_and_exit=FALSE, positional_arguments=TRUE)
+## $options
+## $options$times
+## [1] 3
+## 
+## $options$time
+## [1] TRUE
+## 
+## $options$install
+## [1] TRUE
+## 
+## 
+## $args
+## [1] "."
+```
+
+And finally, `scribe`:
+
+
+``` r
+library(scribe)
+
+s.parser <- command_args(c("-t", "-n", "3", "--install", "."), include=character(0))
+## Error in match.arg(as.character(include), c("help", "version", NA_character_), : 'arg' must be of length >= 1
+```
+
+``` r
+s.parser$add_description("Test your code")
+
+s.parser$add_argument("-h", "--help", action="flag", options=list(no=FALSE), info="Display this usage information and exit")
+s.parser$add_argument("-n", "--times", n=1L, default=1L, info="Run test the specifed number of times")
+s.parser$add_argument("-t", "--time", action="flag", options=list(no=FALSE), info="Print the overall run-time once the test is completed")
+s.parser$add_argument("--install", action="flag", options=list(no=FALSE), info="Install the code before testing it")
+s.parser$add_argument("command", n=1L, info="Command to run or path to code")
+
+s.parser$help()
+## {scribe} command_args
+## 
+## file : {path}
+## 
+## DESCRIPTION
+##   Test your code
+## 
+##   Test your code
+## 
+##   Test your code
+## 
+## USAGE
+##   {command} [--help | --version]
+##   {command} [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] 
+## 
+## ARGUMENTS
+##   -h, --help        : Display this usage information and exit              
+##   -n, --times [ARG] : Run test the specifed number of times                
+##   -t, --time        : Print the overall run-time once the test is completed
+##   --install         : Install the code before testing it                   
+##   command [ARG]     : Command to run or path to code                       
+##   -h, --help        : Display this usage information and exit              
+##   -n, --times [ARG] : Run test the specifed number of times                
+##   -t, --time        : Print the overall run-time once the test is completed
+##   --install         : Install the code before testing it                   
+##   command [ARG]     : Command to run or path to code                       
+##   -h, --help        : Display this usage information and exit              
+##   -n, --times [ARG] : Run test the specifed number of times                
+##   -t, --time        : Print the overall run-time once the test is completed
+##   --install         : Install the code before testing it                   
+##   command [ARG]     : Command to run or path to code
+```
+
+``` r
+s.parser$parse()
+## $help
+## [1] FALSE
+## 
+## $times
+## [1] 1
+## 
+## $time
+## [1] FALSE
+## 
+## $install
+## [1] FALSE
+## 
+## $command
+## NULL
+## 
+## $help
+## NULL
+## 
+## $times
+## NULL
+## 
+## $time
+## NULL
+## 
+## $install
+## NULL
+## 
+## $command
+## NULL
+## 
+## $help
+## NULL
+## 
+## $times
+## NULL
+## 
+## $time
+## NULL
+## 
+## $install
+## NULL
+## 
+## $command
+## NULL
+```
