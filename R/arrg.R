@@ -32,9 +32,10 @@ expandArgs <- function (args, validShort)
 #' @return A list with function elements
 #' * `parse(args)`: Parse the character vector of arguments passed in, or by
 #'   default, the value of `commandArgs(trailingOnly=TRUE)`.
-#' * `show(width)`: Print a usage summary, detailing the valid options and
-#'   patterns. Text will be wrapped to the specified width, which defaults to
-#'   the value of the `width` option.
+#' * `show(con, width)`: Print a usage summary, detailing the valid options and
+#'   patterns. Text will be printed to the specified connection, default
+#'   [stdout()], and wrapped to the width given, which defaults to the value of
+#'   the standard `width` option.
 #' @seealso [opt()], [pat()]
 #' 
 #' @examples
@@ -114,7 +115,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
             stop("Provided arguments do not match any usage pattern")
         
         return (patternMatches[[which(validPatterns)[1]]])
-    }, show = function (width = getOption("width")) {
+    }, show = function (con = stdout(), width = getOption("width")) {
         lines <- character(0)
         
         if (!is.null(header))
@@ -143,6 +144,6 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         if (!is.null(footer))
             lines <- c(lines, strwrap(footer, width), "")
         
-        cat(lines, sep="\n")
+        cat(lines, file=con, sep="\n")
     })
 }

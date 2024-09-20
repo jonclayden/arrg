@@ -25,9 +25,10 @@ A list with function elements
 \itemize{
 \item \code{parse(args)}: Parse the character vector of arguments passed in, or by
 default, the value of \code{commandArgs(trailingOnly=TRUE)}.
-\item \code{show(width)}: Print a usage summary, detailing the valid options and
-patterns. Text will be wrapped to the specified width, which defaults to
-the value of the \code{width} option.
+\item \code{show(con, width)}: Print a usage summary, detailing the valid options and
+patterns. Text will be printed to the specified connection, default
+\code{\link[=stdout]{stdout()}}, and wrapped to the width given, which defaults to the value of
+the standard \code{width} option.
 }
 }
 \description{
