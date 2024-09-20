@@ -175,7 +175,7 @@ And finally, `scribe`:
 ```{r}
 library(scribe)
 
-s.parser <- command_args(c("-t", "-n", "3", "--install", "."), include=character(0))
+s.parser <- command_args(c("-t", "-n", "3", "--install", "."), include=NA_character_)
 s.parser$add_description("Test your code")
 
 s.parser$add_argument("-h", "--help", action="flag", options=list(no=FALSE), info="Display this usage information and exit")

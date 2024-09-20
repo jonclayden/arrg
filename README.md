@@ -169,7 +169,7 @@ ap.parser <- arg_parser("Test your code", "test", TRUE) |>
 # parse_args(ap.parser, c("-tn3", "--install", "."))
 ```
 
-This does a pretty good job, but it writes its output to `stderr`, which doesn't show up here. (This is why the action lines at the end are commented out.) There are some other limitations which make it nonequivalent to the `arrg` version: the help option doesn't allow any customisation, it doesn't seem to be possible to have a variable number of positional arguments, options can't only have a long 
+This does a pretty good job, but it writes its output to `stderr`, which doesn't show up here. (This is why the action lines at the end are commented out.) There are some other limitations which make it nonequivalent to the `arrg` version: the help option doesn't allow any customisation, it doesn't seem to be possible to have a variable number of positional arguments, options can't only have a long form, and so on.
 
 Next up is `defineOptions`.
 
@@ -225,7 +225,7 @@ parse_with_defs(do.parser, c("-tn3", "--install", "."))
 ## Error in parse_with_defs(do.parser, c("-tn3", "--install", ".")):
 ```
 
-This doesn't seem to work. Now, `optigrab`, which doesn't use a parser object but instead 
+This doesn't seem to work. Now, `optigrab`, which doesn't use a parser object or up-front interface specification, but just searches for each option on demand.
 
 
 ``` r
@@ -265,6 +265,14 @@ Now `optparse`:
 
 ``` r
 library(optparse)
+## 
+## Attaching package: 'optparse'
+## The following object is masked from 'package:argparser':
+## 
+##     parse_args
+```
+
+``` r
 
 op.parser <- OptionParser(prog="test",
     usage=c("\n  %prog -h\n  %prog [-n <count>] [-t] <command> [<arg>...]\n  %prog [-n <count>] [-t] [--install] [<path>]"),
@@ -336,11 +344,7 @@ And finally, `scribe`:
 ``` r
 library(scribe)
 
-s.parser <- command_args(c("-t", "-n", "3", "--install", "."), include=character(0))
-## Error in match.arg(as.character(include), c("help", "version", NA_character_), : 'arg' must be of length >= 1
-```
-
-``` r
+s.parser <- command_args(c("-t", "-n", "3", "--install", "."), include=NA_character_)
 s.parser$add_description("Test your code")
 
 s.parser$add_argument("-h", "--help", action="flag", options=list(no=FALSE), info="Display this usage information and exit")
@@ -357,25 +361,11 @@ s.parser$help()
 ## DESCRIPTION
 ##   Test your code
 ## 
-##   Test your code
-## 
-##   Test your code
-## 
 ## USAGE
 ##   {command} [--help | --version]
-##   {command} [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] 
+##   {command} [-h, --help] [-n, --times [ARG]] [-t, --time] [--install] [command [ARG]] 
 ## 
 ## ARGUMENTS
-##   -h, --help        : Display this usage information and exit              
-##   -n, --times [ARG] : Run test the specifed number of times                
-##   -t, --time        : Print the overall run-time once the test is completed
-##   --install         : Install the code before testing it                   
-##   command [ARG]     : Command to run or path to code                       
-##   -h, --help        : Display this usage information and exit              
-##   -n, --times [ARG] : Run test the specifed number of times                
-##   -t, --time        : Print the overall run-time once the test is completed
-##   --install         : Install the code before testing it                   
-##   command [ARG]     : Command to run or path to code                       
 ##   -h, --help        : Display this usage information and exit              
 ##   -n, --times [ARG] : Run test the specifed number of times                
 ##   -t, --time        : Print the overall run-time once the test is completed
@@ -389,44 +379,14 @@ s.parser$parse()
 ## [1] FALSE
 ## 
 ## $times
-## [1] 1
+## [1] 3
 ## 
 ## $time
-## [1] FALSE
+## [1] TRUE
 ## 
 ## $install
-## [1] FALSE
+## [1] TRUE
 ## 
 ## $command
-## NULL
-## 
-## $help
-## NULL
-## 
-## $times
-## NULL
-## 
-## $time
-## NULL
-## 
-## $install
-## NULL
-## 
-## $command
-## NULL
-## 
-## $help
-## NULL
-## 
-## $times
-## NULL
-## 
-## $time
-## NULL
-## 
-## $install
-## NULL
-## 
-## $command
-## NULL
+## [1] "."
 ```
