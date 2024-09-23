@@ -1,6 +1,6 @@
 Package: arrg
 Version: 0.1.0
-Date: 2024-09-19
+Date: 2024-09-23
 Title: Flexible Argument Parsing for R Scripts
 Authors@R: person("Jon", "Clayden", role=c("cre","aut"), email="code@clayden.org", comment=c(ORCID="0000-0002-6608-0619"))
 Imports: ore

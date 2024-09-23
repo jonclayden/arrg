@@ -152,7 +152,7 @@ docopt::docopt(paste(help,collapse="\n"), c("-tn3", "--install", "."))
 ## NULL
 ```
 
-`optigrab` doesn't use a parser object or up-front interface specification, but just searches for each option on demand. It generates basic usage for options it has seen when `opt_help()` is called.
+`optigrab` doesn't use a parser object or up-front interface specification, but just searches for each option on demand. As a result, the requested options must already be in scope when its functions are called. It generates basic usage for options it has seen when `opt_help()` is called.
 
 
 ``` r
