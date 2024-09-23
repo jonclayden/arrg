@@ -124,7 +124,7 @@ For a fairly basic piece of functionality like this, portability is important to
 
 Package `batch` doesn't use Unix-style options, but rather an argument list of alternating variable names and values which are interpreted as R expressions. It's an neat and simple solution, but a little verbose to use in my opinion, especially for simple on/off flags. `getopt` is very bare-bones, and is essentially subsumed by `optparse`. I couldn't get `defineOptions` to work as expected using the documentation.
 
-That still leaves various alternatives. `docopt` is a solid option if its heuristics work for you. Indeed, it parses `arrg`'s help string correctly for the test case above:
+That still leaves various alternatives. `docopt` is a solid option if its heuristics work for you. Indeed, it parses `arrg`'s help string correctly for the test case above, and is the only other package that seems to handle multiple usage patterns and short-option clusters like `-tn3`.
 
 
 ``` r
@@ -152,84 +152,15 @@ docopt::docopt(paste(help,collapse="\n"), c("-tn3", "--install", "."))
 ## NULL
 ```
 
-Here's an implementation with `argparser`:
-
-
-``` r
-library(argparser)
-
-ap.parser <- arg_parser("Test your code", "test", TRUE) |>
-    add_argument("--times", "Run test the specifed number of times", default=1L, short="-n") |>
-    add_argument("--time", "Print the overall run-time once the test is completed", flag=TRUE) |>
-    add_argument("--install", "Install the code before testing it", flag=TRUE) |>
-    add_argument("command", "Command to run or path to code")
-
-# print(ap.parser)
-# parse_args(ap.parser, "-h")
-# parse_args(ap.parser, c("-tn3", "--install", "."))
-```
-
-This does a pretty good job, but it writes its output to `stderr`, which doesn't show up here. (This is why the action lines at the end are commented out.) There are some other limitations which make it nonequivalent to the `arrg` version: the help option doesn't allow any customisation, it doesn't seem to be possible to have a variable number of positional arguments, options can't only have a long form, and so on.
-
-Next up is `defineOptions`.
-
-
-``` r
-library(defineOptions)
-
-do.parser <- new_parser_def() |>
-    define_option(list(def_name="help", def_type="logical", short_option="-h", long_option="--help", callback=opt_optional_input_disallowed(TRUE, FALSE))) |>
-    define_option(list(def_name="times", def_type="integer", short_option="-n", long_option="--times", callback=opt_optional_input_required(1L))) |>
-    define_option(list(def_name="time", def_type="logical", short_option="-t", long_option="--time", callback=opt_optional_input_disallowed(TRUE, FALSE))) |>
-    define_option(list(def_name="install", def_type="logical", long_option="--install", callback=opt_optional_input_disallowed(TRUE, FALSE)))
-
-parse_with_defs(do.parser, "-h")
-## $values
-## $values$help
-## [1] FALSE
-## 
-## $values$times
-## [1] 1
-## 
-## $values$time
-## [1] FALSE
-## 
-## $values$install
-## [1] FALSE
-## 
-## 
-## $opt_specified
-## $opt_specified$help
-## [1] FALSE
-## 
-## $opt_specified$times
-## [1] FALSE
-## 
-## $opt_specified$time
-## [1] FALSE
-## 
-## $opt_specified$install
-## [1] FALSE
-## 
-## 
-## $positional
-## [1] "-h"
-## 
-## attr(,"class")
-## [1] "parsed_result"
-```
-
-``` r
-parse_with_defs(do.parser, c("-tn3", "--install", "."))
-## undefined option specified: -tn3
-## Error in parse_with_defs(do.parser, c("-tn3", "--install", ".")):
-```
-
-This doesn't seem to work. Now, `optigrab`, which doesn't use a parser object or up-front interface specification, but just searches for each option on demand.
+`optigrab` doesn't use a parser object or up-front interface specification, but just searches for each option on demand. It generates basic usage for options it has seen when `opt_help()` is called.
 
 
 ``` r
 library(optigrab)
+## optigrab-0.9.2.1 (2019-01-05) - Copyright © 2019 Decision Patterns
+```
+
+``` r
 
 opts <- c("-t", "-n", "3", "--install", ".")
 
@@ -256,26 +187,17 @@ list(help=opt_get(c("h","help"), FALSE, description="Display this usage informat
 
 ``` r
 
-opt_help()
-## [1] FALSE
+# This will quit a non-interative R session
+# opt_help(opts="--help")
 ```
 
-Now `optparse`:
+The `optparse` package works similarly to `arrg`, although it has quite basic support for positional arguments and creates only a simple usage block by default.
 
 
 ``` r
 library(optparse)
-## 
-## Attaching package: 'optparse'
-## The following object is masked from 'package:argparser':
-## 
-##     parse_args
-```
-
-``` r
 
 op.parser <- OptionParser(prog="test",
-    usage=c("\n  %prog -h\n  %prog [-n <count>] [-t] <command> [<arg>...]\n  %prog [-n <count>] [-t] [--install] [<path>]"),
     add_help_option=FALSE,
     description="Test your code",
     epilogue="Run the test on the code at the specified path (default \".\"), or run a specific command.") |>
@@ -285,10 +207,7 @@ op.parser <- OptionParser(prog="test",
     add_option("--install", "store_true", help="Install the code before testing it")
 
 print_help(op.parser)
-## Usage: 
-##   test -h
-##   test [-n <count>] [-t] <command> [<arg>...]
-##   test [-n <count>] [-t] [--install] [<path>]
+## Usage: test [options]
 ## Test your code
 ## 
 ## Options:
@@ -338,7 +257,7 @@ parse_args(op.parser, c("-t", "-n", "3", "--install", "."), print_help_and_exit=
 ## [1] "."
 ```
 
-And finally, `scribe`:
+And finally, `scribe` generates nice help output, but I couldn't figure out how to fully suppress its default `--help` and `--version` options:
 
 
 ``` r
