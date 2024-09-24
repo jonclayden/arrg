@@ -5,7 +5,7 @@ Title: Flexible Argument Parsing for R Scripts
 Authors@R: person("Jon", "Clayden", role=c("cre","aut"), email="code@clayden.org", comment=c(ORCID="0000-0002-6608-0619"))
 Imports: ore
 Suggests: tinytest, covr
-Description: A package for argument parsing, with support for long and short
+Description: Argument parsing for R scripts, with support for long and short
     Unix-style options including option clustering, positional arguments
     including those of variable length, and multiple usage patterns which may
     take different subsets of options.
