@@ -15,7 +15,7 @@ But none of these suited me, [because I'm picky](#why-arrg), so I wrote my own.
 
 ## Installation and status
 
-The `arrg` package is not yet on CRAN, though it should be soon. In the meantime it can be installed using the `remotes` package:
+The latest release version of the `arrg` package is available [on CRAN](https://cran.r-project.org/package=arrg). The development version can be installed using the `remotes` package if required:
 
 ```{r, eval=FALSE}
 # install.packages("remotes")
