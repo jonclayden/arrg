@@ -3,6 +3,8 @@ knitr::opts_chunk$set(collapse=TRUE)
 options(width=70)
 ```
 
+[![CRAN version](https://www.r-pkg.org/badges/version/arrg)](https://cran.r-project.org/package=arrg) [![CI](https://github.com/jonclayden/arrg/actions/workflows/ci.yaml/badge.svg)](https://github.com/jonclayden/arrg/actions/workflows/ci.yaml) [![codecov](https://codecov.io/gh/jonclayden/arrg/graph/badge.svg?token=CZCLmaK8Ty)](https://codecov.io/gh/jonclayden/arrg) [![Dependencies](https://tinyverse.netlify.app/badge/arrg)](https://cran.r-project.org/package=arrg)
+
 # arrg: Flexible argument parsing for R scripts
 
 [R](https://www.r-project.org) is a scripting language. While often used interactively in exploratory data science, or run batch-style to replicate a previous analysis, the language can also be used for shell-like scripting at a command line. This usage is supported by the `Rscript` binary provided with R, and by [the `littler` project](https://github.com/eddelbuettel/littler), but parsing script arguments requires additional effort.
