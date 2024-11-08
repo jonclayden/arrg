@@ -48,7 +48,7 @@ resolvePattern <- function (spec, optInfo)
             if (is.null(m))
                 stop("Format of positional arguments is invalid")
             else
-                data.frame(name=m[,1], format=m[,1], option=FALSE, multiple=!is.na(m[,2]), required=is.na(m[,3]))
+                data.frame(name=m[,1], format=m[,1], option=FALSE, multiple=!is.na(m[,2]), required=is.na(m[,3]), stringsAsFactors=FALSE)
         })
         argInfo <- do.call(rbind, argInfo)
         nargs <- nrow(argInfo)
@@ -65,14 +65,14 @@ resolvePattern <- function (spec, optInfo)
             if (validLongOpts[i]) {
                 index <- which(optInfo$long == longMatches[i,,1])
                 format <- paste0("--", longMatches[i,,1], ifelse(optInfo$arg[index], paste0("=<",optInfo$argname[index],">"), ""))
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=format, option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2])))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=format, option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2]), stringsAsFactors=FALSE))
             } else {
                 shortMatches <- ore_search("(\\w)(!)?", opts[i], all=TRUE)
                 if (!all(shortMatches[,1] %in% optInfo$short))
                     stop("Pattern uses options not included in the main specification")
                 indices <- match(shortMatches[,1], optInfo$short)
                 formats <- paste0("-", shortMatches[,1], ifelse(optInfo$arg[indices], paste0(" <",optInfo$argname[indices],">"), ""))
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=formats, option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2])))
+                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=formats, option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2]), stringsAsFactors=FALSE))
             }
         }
     }

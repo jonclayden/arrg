@@ -50,5 +50,6 @@ opt <- function (label, description, arg = FALSE, default = NA_character_)
                arg=arg,
                argname=argname,
                default=default,
-               mode=storage.mode(default))
+               mode=storage.mode(default),
+               stringsAsFactors=FALSE)
 }
