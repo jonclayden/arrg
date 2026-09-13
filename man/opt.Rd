@@ -4,27 +4,31 @@
 \alias{opt}
 \title{Specify an option in long or short form}
 \usage{
-opt(label, description, arg = FALSE, default = NA_character_)
+opt(label, description, arg = FALSE, default = NULL)
 }
 \arguments{
 \item{label}{A short-form (single character) and/or long-form label for the
 option, specified comma-separated in a single string. At most one of each
-form must be given. Leading hyphens are optional.}
+form must be given. Leading hyphens and surrounding whitespace are
+optional, and will be stripped.}
 
 \item{description}{A textual description of the option, for use in the usage
 summary.}
 
 \item{arg}{The name of the option's argument, if it takes one. Otherwise
-\code{FALSE}, indicating no argument.}
+\code{FALSE}, indicating no argument. If a \code{default} is given then the option
+takes an argument whatever the value of this parameter, and the argument
+will be named after the option unless a name is given here.}
 
 \item{default}{A default value for the argument, if one is accepted. This
 does not have to be a string, and arguments will be coerced to match the
-mode of the default when parsed. If the option takes no argument the
-default value will be \code{FALSE}.}
+mode of the default when parsed. The default value of \code{NULL} means that no
+default is specified: an option taking an argument will then default to
+\code{NA}, and an option taking no argument to \code{FALSE}.}
 }
 \value{
-A data frame giving details of the option. This will not usually be
-used directly, but passed to \code{\link[=arrg]{arrg()}}.
+A list of class \code{"arrgOption"} giving details of the option. This
+will not usually be used directly, but passed to \code{\link[=arrg]{arrg()}}.
 }
 \description{
 This function specifies an option that is accepted by an argument parser.

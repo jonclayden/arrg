@@ -38,8 +38,14 @@ pat <- function (..., options = NULL)
     return (structure(list(...), options=options))
 }
 
-resolvePattern <- function (spec, optInfo)
+resolvePattern <- function (spec, opts)
 {
+    optShort <- optField(opts, "short")
+    optLong <- optField(opts, "long")
+    optName <- optField(opts, "name")
+    optArg <- optField(opts, "arg", logical(1))
+    optArgname <- optField(opts, "argname")
+    
     argInfo <- list()
     
     if (length(spec) > 0) {
@@ -57,27 +63,32 @@ resolvePattern <- function (spec, optInfo)
     }
     
     if (!is.null(attr(spec, "options"))) {
-        opts <- ore_split(",", attr(spec, "options"))
-        longMatches <- ore_search("^(\\w+)(!)?$", opts, simplify=FALSE)
-        validLongOpts <- longMatches[,,1] %in% optInfo$long
+        labels <- trimws(unlist(ore_split(",", attr(spec, "options"))))
+        labels <- labels[nzchar(labels)]
         
-        for (i in seq_along(opts)) {
-            if (validLongOpts[i]) {
-                index <- which(optInfo$long == longMatches[i,,1])
-                format <- paste0("--", longMatches[i,,1], ifelse(optInfo$arg[index], paste0("=<",optInfo$argname[index],">"), ""))
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[index], format=format, option=TRUE, multiple=FALSE, required=!is.na(longMatches[i,,2]), stringsAsFactors=FALSE))
+        for (label in labels) {
+            longMatch <- ore_search("^(\\w+)(!)?$", label)
+            index <- if (is.null(longMatch)) NA_integer_ else match(longMatch[,1], optLong)
+            if (!is.na(index)) {
+                format <- paste0("--", optLong[index], ifelse(optArg[index], paste0("=<",optArgname[index],">"), ""))
+                required <- !is.na(longMatch[,2])
             } else {
-                shortMatches <- ore_search("(\\w)(!)?", opts[i], all=TRUE)
-                if (!all(shortMatches[,1] %in% optInfo$short))
+                # Not a known long-form label, so treat it as a cluster of
+                # short-form ones, each optionally followed by an exclamation
+                if (!(label %~% "^(\\w!?)+$"))
+                    stop("Invalid option specification in pattern: ", label)
+                shortMatches <- ore_search("(\\w)(!)?", label, all=TRUE)
+                if (!all(shortMatches[,1] %in% optShort))
                     stop("Pattern uses options not included in the main specification")
-                indices <- match(shortMatches[,1], optInfo$short)
-                formats <- paste0("-", shortMatches[,1], ifelse(optInfo$arg[indices], paste0(" <",optInfo$argname[indices],">"), ""))
-                argInfo <- rbind(argInfo, data.frame(name=optInfo$name[indices], format=formats, option=TRUE, multiple=FALSE, required=!is.na(shortMatches[,2]), stringsAsFactors=FALSE))
+                index <- match(shortMatches[,1], optShort)
+                format <- paste0("-", optShort[index], ifelse(optArg[index], paste0(" <",optArgname[index],">"), ""))
+                required <- !is.na(shortMatches[,2])
             }
+            argInfo <- rbind(argInfo, data.frame(name=optName[index], format=format, option=TRUE, multiple=FALSE, required=required, stringsAsFactors=FALSE))
         }
     }
     
-    return(argInfo)
+    return (argInfo)
 }
 
 matchPattern <- function (pattern, parsed, defaults)

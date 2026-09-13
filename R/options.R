@@ -1,3 +1,9 @@
+# Extract a single field from each of a list of option records, as a vector
+optField <- function (opts, field, type = character(1))
+{
+    vapply(opts, function (o) o[[field]], type, USE.NAMES=FALSE)
+}
+
 #' Specify an option in long or short form
 #' 
 #' This function specifies an option that is accepted by an argument parser.
@@ -6,17 +12,21 @@
 #' 
 #' @param label A short-form (single character) and/or long-form label for the
 #'   option, specified comma-separated in a single string. At most one of each
-#'   form must be given. Leading hyphens are optional.
+#'   form must be given. Leading hyphens and surrounding whitespace are
+#'   optional, and will be stripped.
 #' @param description A textual description of the option, for use in the usage
 #'   summary.
 #' @param arg The name of the option's argument, if it takes one. Otherwise
-#'   `FALSE`, indicating no argument.
+#'   `FALSE`, indicating no argument. If a `default` is given then the option
+#'   takes an argument whatever the value of this parameter, and the argument
+#'   will be named after the option unless a name is given here.
 #' @param default A default value for the argument, if one is accepted. This
 #'   does not have to be a string, and arguments will be coerced to match the
-#'   mode of the default when parsed. If the option takes no argument the
-#'   default value will be `FALSE`.
-#' @return A data frame giving details of the option. This will not usually be
-#'   used directly, but passed to [arrg()].
+#'   mode of the default when parsed. The default value of `NULL` means that no
+#'   default is specified: an option taking an argument will then default to
+#'   `NA`, and an option taking no argument to `FALSE`.
+#' @return A list of class `"arrgOption"` giving details of the option. This
+#'   will not usually be used directly, but passed to [arrg()].
 #' @seealso [arrg()]
 #' 
 #' @examples
@@ -28,28 +38,61 @@
 #' 
 #' @author Jon Clayden
 #' @export
-opt <- function (label, description, arg = FALSE, default = NA_character_)
+opt <- function (label, description, arg = FALSE, default = NULL)
 {
-    label <- ore_split(ore(",",syntax="fixed"), label)
-    shortForm <- label %~% "^-?\\w$"
-    if (length(label) == 0L || sum(shortForm) > 1L || sum(!shortForm) > 1L)
+    if (missing(description))
+        stop("A description must be given for each option")
+    if (!is.character(description) || length(description) != 1L || is.na(description))
+        stop("An option description must be a single string")
+    if (!is.character(label) || length(label) == 0L)
+        stop("An option label must be a string")
+    
+    labels <- trimws(unlist(ore_split(ore(",",syntax="fixed"), label)))
+    labels <- ore_subst("^-+", "", labels)
+    if (!all(labels %~% "^\\w+$"))
+        stop("Option labels must be alphanumeric")
+    
+    shortForm <- labels %~% "^\\w$"
+    if (length(labels) == 0L || sum(shortForm) > 1L || sum(!shortForm) > 1L)
         stop("Too few or too many labels for option")
     
     argname <- NA_character_
     if (is.character(arg)) {
+        if (length(arg) != 1L || is.na(arg))
+            stop("An option's argument name must be a single string")
         argname <- arg
         arg <- TRUE
     }
-    arg <- arg || !is.na(default)
-    if (!arg) default <- FALSE
+    if (!is.logical(arg) || length(arg) != 1L || is.na(arg))
+        stop("An option's argument must be named, or FALSE if it takes none")
     
-    data.frame(short=ifelse(any(shortForm),label[shortForm],NA),
-               long=ifelse(any(!shortForm),label[!shortForm],NA),
-               name=label[which.max(nchar(label))],
-               description=description,
-               arg=arg,
-               argname=argname,
-               default=default,
-               mode=storage.mode(default),
-               stringsAsFactors=FALSE)
+    # The name used to key the option in parsed output: the long label if there
+    # is one, otherwise the short label
+    name <- labels[which.max(nchar(labels))]
+    
+    # Specifying a default implies that the option takes an argument. Storing
+    # each option separately (rather than in a shared data frame) means that
+    # defaults keep their own modes, whatever other options are specified
+    if (!is.null(default)) {
+        arg <- TRUE
+        mode <- storage.mode(default)
+    } else if (arg) {
+        default <- NA_character_
+        mode <- "character"
+    } else {
+        default <- FALSE
+        mode <- "logical"
+    }
+    if (arg && is.na(argname))
+        argname <- name
+    
+    structure(list(short=if (any(shortForm)) labels[shortForm] else NA_character_,
+                   long=if (any(!shortForm)) labels[!shortForm] else NA_character_,
+                   name=name,
+                   description=description,
+                   arg=arg,
+                   argname=argname,
+                   default=default,
+                   mode=mode),
+              class="arrgOption")
 }
