@@ -40,3 +40,54 @@ expect_error(args$parse("--times"), "argument")
 expect_error(args$parse("--time=yes"), "argument")
 expect_warning(args$parse(c("-n", "-3")), "parameter")
 expect_error(args$parse(c("-h", "-t")), "pattern")
+
+# Option labels: leading hyphens and surrounding whitespace are stripped
+expect_equal(opt("-h,--help","x")$long, "help")
+expect_equal(opt("h, help","x")$short, "h")
+expect_equal(opt("h, help","x")$long, "help")
+expect_error(opt("h!lp","x"), "alphanumeric")
+expect_error(arrg("test", "notanopt"), "opt()")
+
+# Duplicate labels are caught when the parser is created
+expect_error(arrg("test", opt("v,verbose","a"), opt("v,vlevel","b")), "Duplicate short")
+expect_error(arrg("test", opt("v,verbose","a"), opt("w,verbose","b")), "Duplicate long")
+
+# Defaults keep their own modes, whatever other options are specified
+mixed <- arrg("test", opt("h,help","a"), opt("n,times","b",arg="c",default=1L),
+              opt("s,scale","c",arg="x",default=2.5), opt("o,out","d",arg="f",default="stdout"),
+              patterns=list(pat(options="hnso")))
+defaults <- mixed$parse(character(0))
+expect_equal(defaults$help, FALSE)
+expect_equal(defaults$times, 1L)
+expect_equal(defaults$scale, 2.5)
+expect_equal(defaults$out, "stdout")
+expect_equal(mixed$parse(c("-n","7"))$times, 7L)
+
+# A default implies an argument, named after the option unless specified
+expect_true(opt("o,out","d",default="x")$arg)
+expect_equal(opt("o,out","d",default="x")$argname, "out")
+expect_equal(opt("n,num","d",default=c(1L,2L))$default, c(1L,2L))
+expect_equal(opt("n,num","d",arg="v")$default, NA_character_)
+
+# A parser with no options at all is still usable
+bare <- arrg("bare", patterns=list(pat("x...")))
+expect_equal(bare$parse("foo")$x, "foo")
+expect_stdout(bare$show(), "Usage")
+expect_error(bare$parse("-abc"), "Unexpected")
+
+# Unknown short-option clusters are reported whole, not split at "NA"
+naish <- arrg("test", opt("install","a"), opt("v","b"), patterns=list(pat("x?",options="v,install")))
+expect_error(naish$parse("-NAv"), "-NAv")
+
+# Whitespace in a pattern's option list, and an empty one
+expect_true(arrg("test", opt("h,help","a"), opt("install","b"),
+                 patterns=list(pat(options="h, install")))$parse("--install")$install)
+expect_equal(arrg("test", opt("v","a"), patterns=list(pat("x",options="")))$parse("q")$x, "q")
+
+# Usage output: no <NA> argument names, and patterns of differing wrapped length
+expect_stdout(arrg("test", opt("o,out","Output file",default="x"),
+                   patterns=list(pat(options="o")))$show(), "<out>")
+wrapped <- arrg("cmd", opt("n,times","d",arg="count"), opt("v","verbose"),
+                patterns=list(pat(options="v"),
+                              pat("aaaaaaaaaa","bbbbbbbbbb","cccccccccc","dddddddddd", options="nv")))
+expect_stdout(wrapped$show(width=40), "Usage")
