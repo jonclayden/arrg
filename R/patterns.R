@@ -14,29 +14,44 @@
 #'   be followed by a question mark. Optional arguments must come after all
 #'   required ones. The final positional argument (only) may take multiple
 #'   values, in which case it should contain an ellipsis (...), before the
-#'   question mark if the argument is also optional.
-#' @param options A string naming the long or short labels of options that can
+#'   question mark if the argument is also optional. An argument may instead be
+#'   given as a named element, as in `pat(path=".")`, in which case the name is
+#'   the specification and the value is a default. Such an argument is
+#'   optional, and a value given for it will be coerced to the mode of the
+#'   default, as for [opt()].
+#' @param .options A string naming the long or short labels of options that can
 #'   be specified with this pattern, comma-separated. Short form options may be
 #'   given in one letter cluster for convenience. Options are only required if
-#'   followed by an exclamation mark.
+#'   followed by an exclamation mark. The leading period distinguishes this
+#'   parameter from the positional arguments passed in `...`, whose names can
+#'   never contain one.
 #' @return A list capturing the positional arguments, with options in an
 #'   attribute. This will not usually be used directly, but passed to [arrg()].
 #' @seealso [arrg()]
 #' 
 #' @examples
 #'   # A pattern with no positional arguments, but requiring the -h flag
-#'   pat(options="h!")
+#'   pat(.options="h!")
 #'   
 #'   # A pattern that takes a command and variable number of arguments, and
 #'   # accepts the -n and -t options (note the latter are specified in cluster
 #'   # form, but "n,t" is also valid) 
-#'   pat("command", "arg...?", options="nt")
+#'   pat("command", "arg...?", .options="nt")
+#'   
+#'   # A pattern with one optional argument, which defaults to "." if it is
+#'   # not given
+#'   pat(path=".")
 #' 
 #' @author Jon Clayden
 #' @export
-pat <- function (..., options = NULL)
+pat <- function (..., .options = NULL)
 {
-    return (structure(list(...), options=options))
+    args <- list(...)
+    # Transitional: ".options" was originally called "options", which would
+    # otherwise now be quietly taken as a positional argument with a default
+    if ("options" %in% names(args))
+        stop("The \"options\" argument to pat() is now called \".options\"")
+    return (structure(args, options=.options))
 }
 
 # An indication that a pattern did not match, with the reason why, as distinct
@@ -56,17 +71,40 @@ resolvePattern <- function (spec, opts)
     
     # Positional arguments and options are kept separately, since they are
     # matched and formatted in quite different ways
-    argInfo <- data.frame(name=character(0), format=character(0), multiple=logical(0), required=logical(0), stringsAsFactors=FALSE)
+    argInfo <- data.frame(name=character(0), format=character(0), multiple=logical(0), required=logical(0), mode=character(0), stringsAsFactors=FALSE)
     optInfo <- data.frame(name=character(0), label=character(0), format=character(0), required=logical(0), stringsAsFactors=FALSE)
     
+    # Defaults are held in a list rather than alongside the rest of the
+    # argument information, so that each keeps its own mode
+    argDefaults <- list()
+    
     if (length(spec) > 0) {
-        argMatches <- ore_search("^(\\w+)(\\.\\.\\.)?(\\?)?$", unlist(spec), simplify=FALSE)
-        argInfo <- do.call(rbind, lapply(argMatches, function (m) {
+        # An argument given as a named element takes its format from the name
+        # and its default value from the element itself; one given unnamed is
+        # just the format, and has no default
+        defaulted <- if (is.null(names(spec))) logical(length(spec)) else nzchar(names(spec))
+        formats <- character(length(spec))
+        formats[defaulted] <- names(spec)[defaulted]
+        if (any(!defaulted)) {
+            unnamed <- spec[!defaulted]
+            if (!all(vapply(unnamed, function (x) is.character(x) && length(x) == 1L, logical(1))))
+                stop("Format of positional arguments is invalid")
+            formats[!defaulted] <- unlist(unnamed)
+        }
+        
+        argMatches <- ore_search("^(\\w+)(\\.\\.\\.)?(\\?)?$", formats, simplify=FALSE)
+        argInfo <- do.call(rbind, mapply(function (m, default, hasDefault) {
             if (is.null(m))
                 stop("Format of positional arguments is invalid")
             else
-                data.frame(name=m[,1], format=m[,1], multiple=!is.na(m[,2]), required=is.na(m[,3]), stringsAsFactors=FALSE)
-        }))
+                data.frame(name=m[,1], format=m[,1], multiple=!is.na(m[,2]),
+                           required=is.na(m[,3]) && !hasDefault,
+                           mode=if (hasDefault) storage.mode(default) else "character",
+                           stringsAsFactors=FALSE)
+        }, argMatches, spec, defaulted, SIMPLIFY=FALSE))
+        
+        argDefaults <- spec[defaulted]
+        names(argDefaults) <- argInfo$name[defaulted]
         
         nargs <- nrow(argInfo)
         if (any(argInfo$multiple[-nargs]))
@@ -104,7 +142,7 @@ resolvePattern <- function (spec, opts)
         }
     }
     
-    return (structure(list(args=argInfo, options=optInfo), class="arrgPattern"))
+    return (structure(list(args=argInfo, options=optInfo, defaults=argDefaults), class="arrgPattern"))
 }
 
 matchPattern <- function (pattern, parsed, defaults)
@@ -128,12 +166,18 @@ matchPattern <- function (pattern, parsed, defaults)
         return (mismatch(es("too many arguments (#{ngiven} given, #{nargs} expected at most)")))
     
     for (i in seq_len(nargs)) {
-        if (i > ngiven)
-            break   # An optional argument that wasn't given is left unset
-        else if (args$multiple[i])
-            result[[args$name[i]]] <- parsed$args[i:ngiven]
-        else
-            result[[args$name[i]]] <- parsed$args[i]
+        name <- args$name[i]
+        if (i <= ngiven) {
+            value <- if (args$multiple[i]) parsed$args[i:ngiven] else parsed$args[i]
+            # Unlike an option, whose mode is the same in every pattern, a
+            # positional argument of the wrong mode only rules out this one
+            coerced <- tryCatch(coerceValue(value, args$mode[i], es("argument <#{args$format[i]}>")),
+                                error=function (cond) mismatch(conditionMessage(cond)))
+            if (inherits(coerced, "arrgMismatch"))
+                return (coerced)
+            result[[name]] <- coerced
+        } else if (!is.null(pattern$defaults[[name]]))
+            result[[name]] <- pattern$defaults[[name]]
     }
     
     for (i in seq_len(nrow(pattern$options))) {

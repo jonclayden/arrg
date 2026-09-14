@@ -49,7 +49,7 @@ standard input.
 }
 \examples{
   # A simple parser for a command called "test" with only one option, -h
-  p <- arrg("test", opt("h", "Print help"), patterns=list(pat(options="h!")))
+  p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
   
   # Print out usage information
   p$show()

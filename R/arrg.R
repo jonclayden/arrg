@@ -63,7 +63,7 @@ coerceValue <- function (value, mode, what)
 #' 
 #' @examples
 #'   # A simple parser for a command called "test" with only one option, -h
-#'   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(options="h!")))
+#'   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
 #'   
 #'   # Print out usage information
 #'   p$show()
@@ -127,13 +127,13 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                     # A value was attached with "=", and may be empty
                     if (!o$arg)
                         stop(es("Long-style option #{label} does not take an argument"))
-                    record(o, label, coerceValue(if (is.na(m[,3])) "" else m[,3], o$mode, label))
+                    record(o, label, coerceValue(if (is.na(m[,3])) "" else m[,3], o$mode, paste("option", label)))
                 } else if (o$arg) {
                     if (i == nargs)
                         stop(es("Long-style option #{label} requires an argument"))
                     else if (tokenType(args[i+1]) != "other")
                         warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to long-style option #{label}"))
-                    record(o, label, coerceValue(args[i+1], o$mode, label))
+                    record(o, label, coerceValue(args[i+1], o$mode, paste("option", label)))
                     i <- i + 1L
                 } else {
                     record(o, label, TRUE)
@@ -160,13 +160,13 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                     }
                     rest <- paste(cluster[-seq_len(j)], collapse="")
                     if (nzchar(rest))
-                        record(o, label, coerceValue(rest, o$mode, label))
+                        record(o, label, coerceValue(rest, o$mode, paste("option", label)))
                     else if (i == nargs)
                         stop(es("Short-style option #{label} requires an argument"))
                     else {
                         if (tokenType(args[i+1]) != "other")
                             warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option #{label}"))
-                        record(o, label, coerceValue(args[i+1], o$mode, label))
+                        record(o, label, coerceValue(args[i+1], o$mode, paste("option", label)))
                         i <- i + 1L
                     }
                     break   # The rest of the cluster was the option's value

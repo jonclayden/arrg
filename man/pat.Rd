@@ -4,7 +4,7 @@
 \alias{pat}
 \title{Specify a usage pattern}
 \usage{
-pat(..., options = NULL)
+pat(..., .options = NULL)
 }
 \arguments{
 \item{...}{Character strings naming positional arguments, if any are valid.
@@ -12,12 +12,18 @@ Positional arguments are required by default; if not required they should
 be followed by a question mark. Optional arguments must come after all
 required ones. The final positional argument (only) may take multiple
 values, in which case it should contain an ellipsis (...), before the
-question mark if the argument is also optional.}
+question mark if the argument is also optional. An argument may instead be
+given as a named element, as in \code{pat(path=".")}, in which case the name is
+the specification and the value is a default. Such an argument is
+optional, and a value given for it will be coerced to the mode of the
+default, as for \code{\link[=opt]{opt()}}.}
 
-\item{options}{A string naming the long or short labels of options that can
+\item{.options}{A string naming the long or short labels of options that can
 be specified with this pattern, comma-separated. Short form options may be
 given in one letter cluster for convenience. Options are only required if
-followed by an exclamation mark.}
+followed by an exclamation mark. The leading period distinguishes this
+parameter from the positional arguments passed in \code{...}, whose names can
+never contain one.}
 }
 \value{
 A list capturing the positional arguments, with options in an
@@ -36,12 +42,16 @@ and no unexpected options are included.
 }
 \examples{
   # A pattern with no positional arguments, but requiring the -h flag
-  pat(options="h!")
+  pat(.options="h!")
   
   # A pattern that takes a command and variable number of arguments, and
   # accepts the -n and -t options (note the latter are specified in cluster
   # form, but "n,t" is also valid) 
-  pat("command", "arg...?", options="nt")
+  pat("command", "arg...?", .options="nt")
+  
+  # A pattern with one optional argument, which defaults to "." if it is
+  # not given
+  pat(path=".")
 
 }
 \seealso{
