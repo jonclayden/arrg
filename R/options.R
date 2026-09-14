@@ -12,8 +12,9 @@ optField <- function (opts, field, type = character(1))
 #' 
 #' @param label A short-form (single character) and/or long-form label for the
 #'   option, specified comma-separated in a single string. At most one of each
-#'   form must be given. Leading hyphens and surrounding whitespace are
-#'   optional, and will be stripped.
+#'   form must be given. Long-form labels may be internally hyphenated, as in
+#'   "dry-run". Leading hyphens and surrounding whitespace are optional, and
+#'   will be stripped.
 #' @param description A textual description of the option, for use in the usage
 #'   summary.
 #' @param arg The name of the option's argument, if it takes one. Otherwise
@@ -49,10 +50,9 @@ opt <- function (label, description, arg = FALSE, default = NULL)
     
     labels <- trimws(unlist(ore_split(ore(",",syntax="fixed"), label)))
     labels <- ore_subst("^-+", "", labels)
-    if (!all(labels %~% "^\\w+$"))
-        stop("Option labels must be alphanumeric")
-    
     shortForm <- labels %~% "^\\w$"
+    if (!all(labels[!shortForm] %~% "^\\w+(-\\w+)*$"))
+        stop("Option labels must be alphanumeric, and may be internally hyphenated")
     if (length(labels) == 0L || sum(shortForm) > 1L || sum(!shortForm) > 1L)
         stop("Too few or too many labels for option")
     

@@ -67,7 +67,7 @@ resolvePattern <- function (spec, opts)
         labels <- labels[nzchar(labels)]
         
         for (label in labels) {
-            longMatch <- ore_search("^(\\w+)(!)?$", label)
+            longMatch <- ore_search("^([\\w-]+)(!)?$", label)
             index <- if (is.null(longMatch)) NA_integer_ else match(longMatch[,1], optLong)
             if (!is.na(index)) {
                 format <- paste0("--", optLong[index], ifelse(optArg[index], paste0("=<",optArgname[index],">"), ""))

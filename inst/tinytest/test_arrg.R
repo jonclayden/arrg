@@ -91,3 +91,37 @@ wrapped <- arrg("cmd", opt("n,times","d",arg="count"), opt("v","verbose"),
                 patterns=list(pat(options="v"),
                               pat("aaaaaaaaaa","bbbbbbbbbb","cccccccccc","dddddddddd", options="nv")))
 expect_stdout(wrapped$show(width=40), "Usage")
+
+# The "--" terminator ends option parsing, and protects what follows
+expect_equal(args$parse(c("--","-tn3"))$command, "-tn3")
+expect_false(args$parse(c("--","-tn3"))$time)
+expect_equal(args$parse(c("-t","--","-n5"))$command, "-n5")
+
+# Positional arguments are never expanded as option clusters
+expect_equal(args$parse(c("mycommand","-tn3"))$arg, "-tn3")
+expect_false(args$parse(c("mycommand","-tn3"))$time)
+
+# Short-option clusters, with a value attached or detached
+expect_equal(args$parse(c("-tn3","."))$times, 3L)
+expect_true(args$parse(c("-tn3","."))$time)
+expect_equal(args$parse(c("-n3","."))$times, 3L)
+expect_equal(args$parse(c("-n","3","."))$times, 3L)
+expect_error(args$parse("-tx"), "-x")      # names the offending letter
+expect_error(args$parse("-xyz"), "-xyz")   # not a cluster at all, so named whole
+
+# Long-form labels may be internally hyphenated
+hyphenated <- arrg("test", opt("n,dry-run","Do nothing"), opt("o,out","Output",arg="file"),
+                   patterns=list(pat("path?", options="n,o")))
+expect_equal(opt("--dry-run","x")$long, "dry-run")
+expect_true(hyphenated$parse("--dry-run")[["dry-run"]])
+expect_true(hyphenated$parse("-n")[["dry-run"]])
+expect_stdout(hyphenated$show(), "--dry-run")
+expect_error(opt("dry-","x"), "hyphenated")
+
+# A lone "-" is a positional argument, conventionally standard input
+expect_equal(args$parse("-")$command, "-")
+expect_equal(hyphenated$parse(c("-o","-"))$out, "-")
+
+# A value attached with "=" may be empty
+expect_equal(hyphenated$parse("--out=")$out, "")
+expect_equal(hyphenated$parse("--out=x")$out, "x")

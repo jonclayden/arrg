@@ -9,8 +9,9 @@ opt(label, description, arg = FALSE, default = NULL)
 \arguments{
 \item{label}{A short-form (single character) and/or long-form label for the
 option, specified comma-separated in a single string. At most one of each
-form must be given. Leading hyphens and surrounding whitespace are
-optional, and will be stripped.}
+form must be given. Long-form labels may be internally hyphenated, as in
+"dry-run". Leading hyphens and surrounding whitespace are optional, and
+will be stripped.}
 
 \item{description}{A textual description of the option, for use in the usage
 summary.}

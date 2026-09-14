@@ -1,22 +1,15 @@
-expandArgs <- function (args, validShort)
+# Classify an argument: "long" for a long-style option, "short" for a short-style
+# option or cluster of them, and "other" for anything else, which includes a
+# positional argument, a lone "-" (conventionally standard input) and the "--"
+# terminator
+tokenType <- function (arg)
 {
-    validShort <- validShort[!is.na(validShort)]
-    if (length(validShort) == 0L)
-        return (args)
-    
-    regex <- ore("^-((", paste(validShort,collapse="|"), ")+)(.*)$")
-    result <- character(0)
-    for (i in seq_along(args)) {
-        if (args[i] %~% regex) {
-            m <- ore_lastmatch()
-            result <- c(result, paste0("-",unlist(strsplit(m[,1], ""))))
-            if (!is.na(m[,3]))
-                result <- c(result, m[,3])
-        } else {
-            result <- c(result, args[i])
-        }
-    }
-    return (result)
+    if (is.na(arg) || arg == "-" || arg == "--" || !(arg %~% "^-"))
+        "other"
+    else if (arg %~% "^--")
+        "long"
+    else
+        "short"
 }
 
 #' Create an argument parser
@@ -25,6 +18,14 @@ expandArgs <- function (args, validShort)
 #' and usage patterns. To parse arguments or display usage information, the
 #' methods \code{parse} or \code{show} contained in the return value should be
 #' called.
+#' 
+#' Options may be given in long form, as in `--times=3` or `--times 3`, or in
+#' short form, as in `-n3` or `-n 3`. Several short-form options may be
+#' clustered behind a single hyphen, with any option that takes an argument
+#' coming last, as in `-tn3`. Option parsing stops at the first positional
+#' argument, or at a `--` argument, which is discarded; everything after that
+#' point is treated as positional, even if it begins with a hyphen. A lone `-`
+#' is always positional, by convention referring to standard input.
 #' 
 #' @param name The name of the command.
 #' @param ... Option specifications. See [opt()] for details.
@@ -77,54 +78,74 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
     .defaults <- structure(lapply(.opts, "[[", "default"), names=.names)
     
     list(parse = function (args = commandArgs(trailingOnly=TRUE)) {
-        args <- expandArgs(args, .short)
-        flags <- as.integer(ore_switch(args, "^--"="2", "^-"="1", "0"))
         nargs <- length(args)
         
-        i <- 1
+        i <- 1L
         result <- list()
         repeat {
             if (i > nargs) break
-            else if (args[i] == "--") {
-                i <- i + 1
+            type <- tokenType(args[i])
+            
+            if (args[i] == "--") {
+                # An explicit end of options: all that follows is positional
+                i <- i + 1L
                 break
-            } else if (flags[i] == 2L) {
-                m <- ore_search("^--(\\w+)(=(.*))?$", args[i])
+            } else if (type == "long") {
+                m <- ore_search("^--([\\w-]+)(=(.*))?$", args[i])
                 index <- if (is.null(m)) NA_integer_ else match(m[,1], .long)
                 if (is.na(index))
                     stop(es("Unexpected long-style option: #{args[i]}"))
                 o <- .opts[[index]]
-                if (!is.na(m[,3])) {
+                if (!is.na(m[,2])) {
+                    # A value was attached with "=", and may be empty
                     if (!o$arg)
                         stop(es("Long-style option --#{o$long} does not take an argument"))
-                    result[[o$name]] <- m[,3] %as% o$mode
+                    result[[o$name]] <- (if (is.na(m[,3])) "" else m[,3]) %as% o$mode
                 } else if (o$arg) {
                     if (i == nargs)
                         stop(es("Long-style option --#{o$long} requires an argument"))
-                    else if (flags[i+1] > 0L)
+                    else if (tokenType(args[i+1]) != "other")
                         warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to long-style option --#{o$long}"))
                     result[[o$name]] <- args[i+1] %as% o$mode
-                    i <- i + 1
+                    i <- i + 1L
                 } else {
                     result[[o$name]] <- TRUE
                 }
-            } else if (flags[i] == 1L) {
-                index <- match(ore_subst("^-","",args[i]), .short)
-                if (is.na(index))
-                    stop(es("Unexpected short-style option: #{args[i]}"))
-                o <- .opts[[index]]
-                if (o$arg) {
-                    if (i == nargs)
+            } else if (type == "short") {
+                # A short-style argument may be a cluster of several options.
+                # Each is taken in turn, and if one requires an argument then
+                # the remainder of the cluster, if any, provides its value
+                cluster <- strsplit(ore_subst("^-", "", args[i]), "")[[1]]
+                j <- 1L
+                while (j <= length(cluster)) {
+                    index <- match(cluster[j], .short)
+                    if (is.na(index)) {
+                        # Name the whole argument if it isn't a cluster at all
+                        label <- if (j == 1L) args[i] else paste0("-", cluster[j])
+                        stop(es("Unexpected short-style option: #{label}"))
+                    }
+                    o <- .opts[[index]]
+                    if (!o$arg) {
+                        result[[o$name]] <- TRUE
+                        j <- j + 1L
+                        next
+                    }
+                    rest <- paste(cluster[-seq_len(j)], collapse="")
+                    if (nzchar(rest))
+                        result[[o$name]] <- rest %as% o$mode
+                    else if (i == nargs)
                         stop(es("Short-style option -#{o$short} requires an argument"))
-                    else if (flags[i+1] > 0L)
-                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option -#{o$short}"))
-                    result[[o$name]] <- args[i+1] %as% o$mode
-                    i <- i + 1
-                } else {
-                    result[[o$name]] <- TRUE
+                    else {
+                        if (tokenType(args[i+1]) != "other")
+                            warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option -#{o$short}"))
+                        result[[o$name]] <- args[i+1] %as% o$mode
+                        i <- i + 1L
+                    }
+                    break   # The rest of the cluster was the option's value
                 }
-            } else break
-            i <- i + 1
+            } else break    # A positional argument, so stop looking for options
+            
+            i <- i + 1L
         }
         
         if (nargs >= i)
