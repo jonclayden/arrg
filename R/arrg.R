@@ -59,11 +59,37 @@ coerceValue <- function (value, mode, what)
 #'   patterns. Text will be printed to the specified connection, default
 #'   [stdout()], and wrapped to the width given, which defaults to the value of
 #'   the standard `width` option.
+#' * `run(body, args, mode, help, exit)`: Run the body of a script, given as a
+#'   function or a block of code in braces, or return a function that will. `args` overrides the arguments to parse, `mode` the
+#'   choice between running (`"script"`) and returning a function
+#'   (`"function"`), `help` names the option that requests usage information,
+#'   and `exit` controls whether the R session is ended after help is given or
+#'   a usage error reported. See Details.
 #' 
 #' @note The option and pattern specifications given to this function are
 #'   evaluated with [opt()] and [pat()] in scope, so a script may call
 #'   `arrg::arrg()` without attaching the package using `library()`, and
 #'   without namespacing each of those nested calls.
+#' 
+#' The `run` method provides a script's entry point. Given a function holding
+#' the body of the script, it either calls it or returns a function that will,
+#' according to how the script was invoked. Run from a command line, by
+#' `Rscript` or `littler`, the arguments are parsed, a request for help is
+#' answered with the usage summary, a usage error is reported on standard
+#' error with a non-zero exit status, and otherwise the body is called. When
+#' the script is `source()`d instead, nothing is run: the value is a function
+#' whose formal arguments correspond to the parser's options and positional
+#' arguments, so that the same script can be driven interactively.
+#' 
+#' The body may take one argument, in which case it receives the parsed
+#' arguments as a list, or none, in which case they are bound in the
+#' environment it runs in and may be referred to by name. Note that such
+#' bindings mask anything of the same name in the enclosing scope, and that a
+#' name the parser could have produced but didn't is bound to `NULL`. A block
+#' of code in braces may also be given in place of a function, and is
+#' equivalent to a function of no arguments. The braces are required: any
+#' other expression is evaluated, and must produce a function, which allows a
+#' body to be built by a factory or taken from a variable.
 #' 
 #' @seealso [opt()], [pat()]
 #' 
@@ -74,6 +100,15 @@ coerceValue <- function (value, mode, what)
 #'   # The same, without attaching the package: opt() and pat() are still
 #'   # available within the call itself
 #'   p <- arrg::arrg("test", opt("h","Print help"), patterns=list(pat(.options="h!")))
+#'   
+#'   # The body of a script. When the script is called from a command line
+#'   # run() calls this directly; when it is source()d, run() instead returns
+#'   # a function, as forced here. The mode is detected automatically by default
+#'   greet <- arrg("greet", opt("n,name","Who to greet",default="world"),
+#'                 patterns=list(pat(.options="n")))
+#'   hello <- greet$run(function () cat("Hello,", name, "\n"), mode="function")
+#'   hello()
+#'   hello(name="reader")
 #'   
 #'   # Print out usage information
 #'   p$show()
@@ -110,7 +145,26 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
     .pats <- lapply(patterns, resolvePattern, .opts)
     .defaults <- structure(lapply(.opts, "[[", "default"), names=.names)
     
-    list(parse = function (args = commandArgs(trailingOnly=TRUE)) {
+    # Every name that any pattern could contribute to a parsed result
+    .allNames <- unique(c(.names, unlist(lapply(.pats, function (p) p$args$name))))
+    
+    # An option's label, preferring the long form, for use in messages
+    .label <- function (i) if (is.na(.long[i])) paste0("-",.short[i]) else paste0("--",.long[i])
+    
+    # Try each pattern in turn, reporting why every one was rejected if none
+    # matches, so that the user can see which they were closest to
+    .match <- function (parsed) {
+        matches <- lapply(.pats, matchPattern, parsed, .defaults)
+        failed <- vapply(matches, inherits, logical(1), "arrgMismatch")
+        if (all(failed)) {
+            reasons <- vapply(matches, function (m) m$reason, character(1))
+            usage <- paste0("  ", name, " ", vapply(.pats, formatPattern, character(1)))
+            stop(paste(c("Provided arguments do not match any usage pattern:", paste0(usage, ": ", reasons)), collapse="\n"), call.=FALSE)
+        }
+        return (matches[[which(!failed)[1]]])
+    }
+    
+    .parse <- function (args = commandArgs(trailingOnly=TRUE)) {
         nargs <- length(args)
         
         # The options given, keyed by option name, the labels the user actually
@@ -200,18 +254,10 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         if (length(.pats) == 0)
             stop("No usage patterns have been specified for this command", call.=FALSE)
         
-        matches <- lapply(.pats, matchPattern, parsed, .defaults)
-        failed <- vapply(matches, inherits, logical(1), "arrgMismatch")
-        if (all(failed)) {
-            # Report why each pattern in turn was rejected, so that the user
-            # can see which one they were closest to matching
-            reasons <- vapply(matches, function (m) m$reason, character(1))
-            usage <- paste0("  ", name, " ", vapply(.pats, formatPattern, character(1)))
-            stop(paste(c("Provided arguments do not match any usage pattern:", paste0(usage, ": ", reasons)), collapse="\n"), call.=FALSE)
-        }
-        
-        return (matches[[which(!failed)[1]]])
-    }, show = function (con = stdout(), width = getOption("width")) {
+        return (.match(parsed))
+    }
+    
+    .show <- function (con = stdout(), width = getOption("width")) {
         lines <- character(0)
         
         if (!is.null(header))
@@ -271,5 +317,104 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
             lines <- c(lines, strwrap(footer, width), "")
         
         cat(lines, file=con, sep="\n")
-    })
+    }
+    
+    # Build a function whose formals correspond to the positional arguments and
+    # options of the parser, and which runs the body when it is called. With
+    # subcommands this would become one such function for each of them
+    .wrapper <- function (body) {
+        argNames <- unique(unlist(lapply(.pats, function (p) p$args$name)))
+        if (is.null(argNames))
+            argNames <- character(0)
+        wrapperNames <- c(argNames, .names)
+        
+        # Every formal is given a default, NULL standing for "not supplied",
+        # so that a missing required argument is reported by the pattern
+        # matcher rather than by R
+        defaults <- vector("list", length(wrapperNames))
+        names(defaults) <- wrapperNames
+        for (i in seq_along(argNames))
+            for (p in .pats)
+                if (!is.null(p$defaults[[argNames[i]]]))
+                    defaults[[i]] <- p$defaults[[argNames[i]]]
+        for (i in seq_along(.names))
+            defaults[[length(argNames)+i]] <- .defaults[[.names[i]]]
+        
+        wrapper <- function () .invoke(body, environment(), match.call())
+        if (length(wrapperNames) > 0L)
+            formals(wrapper) <- as.pairlist(defaults)
+        return (wrapper)
+    }
+    
+    # Reconstruct the same intermediate representation that the command line
+    # produces, so that both routes share one set of semantics
+    .invoke <- function (body, frame, call) {
+        # Only arguments the caller actually gave are passed on, so that the
+        # pattern matcher applies defaults itself, exactly as it does for the
+        # command line. match.call() names any given positionally
+        suppliedNames <- names(as.list(call)[-1])
+        supplied <- mget(if (is.null(suppliedNames)) character(0) else suppliedNames, envir=frame)
+        supplied <- supplied[!vapply(supplied, is.null, logical(1))]
+        
+        optNames <- intersect(names(supplied), .names)
+        indices <- match(optNames, .names)
+        options <- lapply(seq_along(optNames), function (i)
+            coerceValue(supplied[[optNames[i]]], .opts[[indices[i]]]$mode, paste("option", .label(indices[i]))))
+        names(options) <- optNames
+        labels <- structure(as.list(vapply(indices, .label, character(1))), names=optNames)
+        
+        # Positional arguments are taken in the order each pattern declares
+        # them, stopping at the first one that wasn't supplied
+        for (p in .pats) {
+            positional <- character(0)
+            for (n in p$args$name) {
+                if (!(n %in% names(supplied))) break
+                positional <- c(positional, as.character(supplied[[n]]))
+            }
+            parsed <- list(options=options, labels=labels, args=positional)
+            matched <- matchPattern(p, parsed, .defaults)
+            if (!inherits(matched, "arrgMismatch"))
+                return (invokeBody(body, matched, .allNames))
+        }
+        return (.match(list(options=options, labels=labels, args=character(0))))
+    }
+    
+    .run <- function (body, args = NULL, mode = c("auto","script","function"),
+                      help = "help", exit = TRUE) {
+        # The body is captured unevaluated, so that a block of code may be
+        # given as well as a function, and so that identifying which it is
+        # never runs it
+        body <- resolveBody(substitute(body), parent.frame())
+        mode <- match.arg(mode)
+        if (mode == "auto")
+            mode <- if (beingSourced()) "function" else "script"
+        if (mode == "function")
+            return (.wrapper(body))
+        
+        if (is.null(args))
+            args <- scriptArgs()
+        helpIndex <- if (is.null(help)) NA_integer_ else match(help, .names)
+        hint <- if (is.na(helpIndex)) NULL else paste0("Try '", name, " ", .label(helpIndex), "' for more information.")
+        
+        # A request for help is honoured before the arguments are matched
+        # against the patterns, so that it works whatever else was given
+        if (!is.na(helpIndex) && helpRequested(args, .opts[[helpIndex]])) {
+            .show()
+            if (exit) quit("no", status=0L)
+            return (invisible(NULL))
+        }
+        
+        # A usage error is the user's mistake rather than the script's, so it
+        # is reported briefly on stderr instead of as an R error
+        parsed <- tryCatch(.parse(args), error = function (cond) {
+            message(name, ": ", conditionMessage(cond))
+            if (!is.null(hint)) message(hint)
+            if (exit) quit("no", status=1L)
+            stop(cond)
+        })
+        
+        return (invisible(invokeBody(body, parsed, .allNames)))
+    }
+    
+    list(parse = .parse, show = .show, run = .run)
 }

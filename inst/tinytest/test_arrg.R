@@ -262,3 +262,104 @@ expect_true(spliced$parse("-ab")$beta)
 
 patternList <- list(pat("x", .options="v"))
 expect_equal(arrg("test", opt("v","V"), patterns=patternList)$parse(c("-v","q"))$x, "q")
+
+# run() in script mode parses the arguments it is given and calls the body,
+# which may take the parsed arguments as a list
+ran <- NULL
+runner <- arrg("test", opt("v,verbose","Be verbose"),
+               opt("n,times","Count",arg="count",default=1L),
+               patterns=list(pat(path=".", .options="v,n")))
+runner$run(function (args) ran <<- args, args=c("-v","-n3","/tmp"), mode="script", exit=FALSE)
+expect_equal(ran$path, "/tmp")
+expect_equal(ran$times, 3L)
+expect_true(ran$verbose)
+
+# ... or take none, in which case they are bound in the body's environment
+runner$run(function () ran <<- list(path=path, times=times, verbose=verbose),
+           args="/var", mode="script", exit=FALSE)
+expect_equal(ran$path, "/var")
+expect_equal(ran$times, 1L)
+expect_false(ran$verbose)
+
+# A name the parser could have produced but didn't is bound to NULL, and the
+# enclosing scope remains reachable
+absent <- arrg("test", patterns=list(pat("src","dest?")))
+outerValue <- "visible"
+absent$run(function () ran <<- list(dest=is.null(dest), outer=outerValue),
+           args="a", mode="script", exit=FALSE)
+expect_true(ran$dest)
+expect_equal(ran$outer, "visible")
+
+# littler makes a script's arguments available in a top-level "argv" variable
+assign("argv", c("-v","/usr"), envir=globalenv())
+runner$run(function () ran <<- list(path=path, verbose=verbose), mode="script", exit=FALSE)
+rm("argv", envir=globalenv())
+expect_equal(ran$path, "/usr")
+expect_true(ran$verbose)
+
+# In function mode the body is not run; a function is returned whose formals
+# correspond to the positional arguments and options, with their defaults
+wrapper <- runner$run(function (args) args, mode="function")
+expect_true(is.function(wrapper))
+expect_equal(names(formals(wrapper)), c("path","verbose","times"))
+expect_equal(formals(wrapper)$times, 1L)
+expect_equal(wrapper()$path, ".")
+expect_equal(wrapper("/tmp")$path, "/tmp")          # positional, via match.call()
+expect_equal(wrapper(times=5L)$times, 5L)
+expect_true(wrapper(verbose=TRUE)$verbose)
+expect_error(wrapper(times="abc"), "not valid for option")
+expect_error(wrapper(nope=1), "unused argument")
+
+# Arguments left at their defaults are not treated as having been given, so
+# they do not rule out patterns that don't accept them
+twoWay <- arrg("test", opt("h,help","Help"), opt("v","Verbose"),
+               patterns=list(pat(.options="v"), pat(.options="h!")))
+expect_false(twoWay$run(function (args) args, mode="function")()$v)
+
+# A request for help is answered before the patterns are matched, so it works
+# even alongside arguments that are otherwise invalid
+expect_stdout(twoWay$run(function () NULL, args="--help", mode="script", exit=FALSE), "Usage")
+expect_stdout(twoWay$run(function () NULL, args=c("--help","--bogus"), mode="script", exit=FALSE), "Usage")
+
+# Usage errors are reported on standard error, with a hint
+msgs <- capture.output(tryCatch(twoWay$run(function () NULL, args="--bogus",
+                                           mode="script", exit=FALSE),
+                                error=function (cond) NULL), type="message")
+expect_true(any(grepl("^test: Unexpected long-style option", msgs)))
+expect_true(any(grepl("Try 'test --help' for more information", msgs)))
+
+expect_error(runner$run("not a function"), "must be a function")
+
+# A block of code in braces may be given in place of a function, and behaves
+# as a function of no arguments would
+expect_equal(runner$run({ path }, args="/tmp", mode="script", exit=FALSE), "/tmp")
+expect_equal(runner$run({ times }, args=c("-n","4","/tmp"), mode="script", exit=FALSE), 4L)
+
+# The block must not be run in the course of working out what it is, so an
+# invalid set of arguments leaves it untouched
+executed <- FALSE
+invisible(capture.output(tryCatch(runner$run({ executed <<- TRUE }, args="--bogus",
+                                             mode="script", exit=FALSE),
+                                  error=function (cond) NULL), type="message"))
+expect_false(executed)
+
+# A block gets an evaluation frame of its own, so return() and on.exit() work
+cleaned <- FALSE
+expect_equal(runner$run({ on.exit(cleaned <<- TRUE); return(path) },
+                        args="/var", mode="script", exit=FALSE), "/var")
+expect_true(cleaned)
+
+# In function mode a block yields a wrapper, just as a function does
+blockWrapper <- runner$run({ path }, mode="function")
+expect_equal(names(formals(blockWrapper)), c("path","verbose","times"))
+expect_equal(blockWrapper("/usr"), "/usr")
+expect_equal(blockWrapper(), ".")
+
+# Anything that is not a literal block is evaluated and must yield a function,
+# so a function referred to by name or extracted from a list still works
+namedBody <- function (args) args$path
+expect_equal(runner$run(namedBody, args="/tmp", mode="script", exit=FALSE), "/tmp")
+bodyList <- list(function (args) args$path)
+expect_equal(runner$run(bodyList[[1]], args="/var", mode="script", exit=FALSE), "/var")
+expect_error(runner$run("not a function"), "must be a function")
+expect_error(runner$run(42), "must be a function")
