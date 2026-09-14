@@ -9,9 +9,10 @@ pat(..., options = NULL)
 \arguments{
 \item{...}{Character strings naming positional arguments, if any are valid.
 Positional arguments are required by default; if not required they should
-be followed by a question mark. The final positional argument (only) may
-take multiple values, in which case it should contain an ellipsis (...),
-before the question mark if the argument is also optional.}
+be followed by a question mark. Optional arguments must come after all
+required ones. The final positional argument (only) may take multiple
+values, in which case it should contain an ellipsis (...), before the
+question mark if the argument is also optional.}
 
 \item{options}{A string naming the long or short labels of options that can
 be specified with this pattern, comma-separated. Short form options may be

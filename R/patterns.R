@@ -11,9 +11,10 @@
 #' 
 #' @param ... Character strings naming positional arguments, if any are valid.
 #'   Positional arguments are required by default; if not required they should
-#'   be followed by a question mark. The final positional argument (only) may
-#'   take multiple values, in which case it should contain an ellipsis (...),
-#'   before the question mark if the argument is also optional.
+#'   be followed by a question mark. Optional arguments must come after all
+#'   required ones. The final positional argument (only) may take multiple
+#'   values, in which case it should contain an ellipsis (...), before the
+#'   question mark if the argument is also optional.
 #' @param options A string naming the long or short labels of options that can
 #'   be specified with this pattern, comma-separated. Short form options may be
 #'   given in one letter cluster for convenience. Options are only required if
@@ -38,6 +39,13 @@ pat <- function (..., options = NULL)
     return (structure(list(...), options=options))
 }
 
+# An indication that a pattern did not match, with the reason why, as distinct
+# from a list of matched arguments
+mismatch <- function (reason)
+{
+    return (structure(list(reason=reason), class="arrgMismatch"))
+}
+
 resolvePattern <- function (spec, opts)
 {
     optShort <- optField(opts, "short")
@@ -46,20 +54,26 @@ resolvePattern <- function (spec, opts)
     optArg <- optField(opts, "arg", logical(1))
     optArgname <- optField(opts, "argname")
     
-    argInfo <- list()
+    # Positional arguments and options are kept separately, since they are
+    # matched and formatted in quite different ways
+    argInfo <- data.frame(name=character(0), format=character(0), multiple=logical(0), required=logical(0), stringsAsFactors=FALSE)
+    optInfo <- data.frame(name=character(0), label=character(0), format=character(0), required=logical(0), stringsAsFactors=FALSE)
     
     if (length(spec) > 0) {
         argMatches <- ore_search("^(\\w+)(\\.\\.\\.)?(\\?)?$", unlist(spec), simplify=FALSE)
-        argInfo <- lapply(argMatches, function (m) {
+        argInfo <- do.call(rbind, lapply(argMatches, function (m) {
             if (is.null(m))
                 stop("Format of positional arguments is invalid")
             else
-                data.frame(name=m[,1], format=m[,1], option=FALSE, multiple=!is.na(m[,2]), required=is.na(m[,3]), stringsAsFactors=FALSE)
-        })
-        argInfo <- do.call(rbind, argInfo)
+                data.frame(name=m[,1], format=m[,1], multiple=!is.na(m[,2]), required=is.na(m[,3]), stringsAsFactors=FALSE)
+        }))
+        
         nargs <- nrow(argInfo)
         if (any(argInfo$multiple[-nargs]))
             stop("Only the last positional argument can take multiple values")
+        firstOptional <- match(FALSE, argInfo$required)
+        if (!is.na(firstOptional) && any(argInfo$required[-seq_len(firstOptional)]))
+            stop("Required positional arguments cannot follow optional ones")
     }
     
     if (!is.null(attr(spec, "options"))) {
@@ -70,7 +84,8 @@ resolvePattern <- function (spec, opts)
             longMatch <- ore_search("^([\\w-]+)(!)?$", label)
             index <- if (is.null(longMatch)) NA_integer_ else match(longMatch[,1], optLong)
             if (!is.na(index)) {
-                format <- paste0("--", optLong[index], ifelse(optArg[index], paste0("=<",optArgname[index],">"), ""))
+                optLabels <- paste0("--", optLong[index])
+                format <- paste0(optLabels, ifelse(optArg[index], paste0("=<",optArgname[index],">"), ""))
                 required <- !is.na(longMatch[,2])
             } else {
                 # Not a known long-form label, so treat it as a cluster of
@@ -81,53 +96,54 @@ resolvePattern <- function (spec, opts)
                 if (!all(shortMatches[,1] %in% optShort))
                     stop("Pattern uses options not included in the main specification")
                 index <- match(shortMatches[,1], optShort)
-                format <- paste0("-", optShort[index], ifelse(optArg[index], paste0(" <",optArgname[index],">"), ""))
+                optLabels <- paste0("-", optShort[index])
+                format <- paste0(optLabels, ifelse(optArg[index], paste0(" <",optArgname[index],">"), ""))
                 required <- !is.na(shortMatches[,2])
             }
-            argInfo <- rbind(argInfo, data.frame(name=optName[index], format=format, option=TRUE, multiple=FALSE, required=required, stringsAsFactors=FALSE))
+            optInfo <- rbind(optInfo, data.frame(name=optName[index], label=optLabels, format=format, required=required, stringsAsFactors=FALSE))
         }
     }
     
-    return (argInfo)
+    return (structure(list(args=argInfo, options=optInfo), class="arrgPattern"))
 }
 
 matchPattern <- function (pattern, parsed, defaults)
 {
     result <- list()
     
-    parsedOptionNames <- setdiff(names(parsed), ".args")
-    if (!all(parsedOptionNames %in% pattern$name))
-        return (NULL)   # Unexpected option
+    # Every option given must be one that this pattern accepts. The label used
+    # is the one the user actually typed, which may be the short or long form
+    unexpected <- setdiff(names(parsed$options), pattern$options$name)
+    if (length(unexpected) > 0)
+        return (mismatch(es("option #{parsed$labels[[unexpected[1]]]} is not valid here")))
     
-    args <- subset(pattern, !pattern$option)
+    args <- pattern$args
     nargs <- nrow(args)
-    if (nargs > 0) {
-        npargs <- length(parsed$.args)
-        if (sum(args$required) > npargs)
-            return (NULL)   # Too few arguments
-        if (!any(args$multiple) && npargs > nargs)
-            return (NULL)   # Too many arguments
-        
-        for (i in seq_len(nargs)) {
-            if (args$multiple[i] && i <= npargs)
-                result[[args$name[i]]] <- parsed$.args[i:npargs]
-            else
-                result[[args$name[i]]] <- parsed$.args[i]
-        }
+    ngiven <- length(parsed$args)
+    nrequired <- sum(args$required)
+    
+    if (ngiven < nrequired)
+        return (mismatch(es("argument <#{args$format[ngiven+1]}> is required")))
+    if (ngiven > nargs && !any(args$multiple))
+        return (mismatch(es("too many arguments (#{ngiven} given, #{nargs} expected at most)")))
+    
+    for (i in seq_len(nargs)) {
+        if (i > ngiven)
+            break   # An optional argument that wasn't given is left unset
+        else if (args$multiple[i])
+            result[[args$name[i]]] <- parsed$args[i:ngiven]
+        else
+            result[[args$name[i]]] <- parsed$args[i]
     }
     
-    opts <- subset(pattern, pattern$option)
-    nopts <- nrow(opts)
-    if (nopts > 0) {
-        for (i in seq_len(nopts)) {
-            name <- opts$name[i]
-            if (opts$required[i] && is.null(parsed[[name]]))
-                return (NULL)   # Required option missing
-            else if (!is.null(parsed[[name]]))
-                result[[name]] <- parsed[[name]]
-            else if (!is.null(defaults[[name]]))
-                result[[name]] <- defaults[[name]]
-        }
+    for (i in seq_len(nrow(pattern$options))) {
+        name <- pattern$options$name[i]
+        if (!is.null(parsed$options[[name]]))
+            result[[name]] <- parsed$options[[name]]
+        else if (pattern$options$required[i])
+            return (mismatch(es("option #{pattern$options$label[i]} is required")))
+        else if (!is.null(defaults[[name]]))
+            result[[name]] <- defaults[[name]]
     }
     
     return (result)
@@ -137,11 +153,11 @@ formatPattern <- function (pattern)
 {
     elements <- character(0)
     
-    opts <- subset(pattern, pattern$option)
+    opts <- pattern$options
     if (nrow(opts) > 0)
         elements <- c(elements, ifelse(opts$required, opts$format, paste0("[",opts$format,"]")))
     
-    args <- subset(pattern, !pattern$option)
+    args <- pattern$args
     if (nrow(args) > 0)
         elements <- c(elements, paste0(ifelse(args$required,"<","[<"), args$format, ">", ifelse(args$multiple,"...",""), ifelse(args$required,"","]")))
     

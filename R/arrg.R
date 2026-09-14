@@ -22,10 +22,11 @@ tokenType <- function (arg)
 #' Options may be given in long form, as in `--times=3` or `--times 3`, or in
 #' short form, as in `-n3` or `-n 3`. Several short-form options may be
 #' clustered behind a single hyphen, with any option that takes an argument
-#' coming last, as in `-tn3`. Option parsing stops at the first positional
-#' argument, or at a `--` argument, which is discarded; everything after that
-#' point is treated as positional, even if it begins with a hyphen. A lone `-`
-#' is always positional, by convention referring to standard input.
+#' coming last, as in `-tn3`. Options and positional arguments may be freely
+#' interleaved. A `--` argument stops option parsing and is discarded:
+#' everything after it is treated as positional, even if it begins with a
+#' hyphen. A lone `-` is always positional, by convention referring to
+#' standard input.
 #' 
 #' @param name The name of the command.
 #' @param ... Option specifications. See [opt()] for details.
@@ -80,15 +81,25 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
     list(parse = function (args = commandArgs(trailingOnly=TRUE)) {
         nargs <- length(args)
         
+        # The options given, keyed by option name, the labels the user actually
+        # used for them, and the positional arguments, in the order given
+        values <- list()
+        labels <- list()
+        positional <- character(0)
+        record <- function (o, label, value) {
+            values[[o$name]] <<- value
+            labels[[o$name]] <<- label
+        }
+        
         i <- 1L
-        result <- list()
         repeat {
             if (i > nargs) break
             type <- tokenType(args[i])
             
             if (args[i] == "--") {
                 # An explicit end of options: all that follows is positional
-                i <- i + 1L
+                if (i < nargs)
+                    positional <- c(positional, args[(i+1):nargs])
                 break
             } else if (type == "long") {
                 m <- ore_search("^--([\\w-]+)(=(.*))?$", args[i])
@@ -96,20 +107,21 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                 if (is.na(index))
                     stop(es("Unexpected long-style option: #{args[i]}"))
                 o <- .opts[[index]]
+                label <- paste0("--", o$long)
                 if (!is.na(m[,2])) {
                     # A value was attached with "=", and may be empty
                     if (!o$arg)
-                        stop(es("Long-style option --#{o$long} does not take an argument"))
-                    result[[o$name]] <- (if (is.na(m[,3])) "" else m[,3]) %as% o$mode
+                        stop(es("Long-style option #{label} does not take an argument"))
+                    record(o, label, coerceValue(if (is.na(m[,3])) "" else m[,3], o$mode, label))
                 } else if (o$arg) {
                     if (i == nargs)
-                        stop(es("Long-style option --#{o$long} requires an argument"))
+                        stop(es("Long-style option #{label} requires an argument"))
                     else if (tokenType(args[i+1]) != "other")
-                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to long-style option --#{o$long}"))
-                    result[[o$name]] <- args[i+1] %as% o$mode
+                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to long-style option #{label}"))
+                    record(o, label, coerceValue(args[i+1], o$mode, label))
                     i <- i + 1L
                 } else {
-                    result[[o$name]] <- TRUE
+                    record(o, label, TRUE)
                 }
             } else if (type == "short") {
                 # A short-style argument may be a cluster of several options.
@@ -125,40 +137,48 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
                         stop(es("Unexpected short-style option: #{label}"))
                     }
                     o <- .opts[[index]]
+                    label <- paste0("-", o$short)
                     if (!o$arg) {
-                        result[[o$name]] <- TRUE
+                        record(o, label, TRUE)
                         j <- j + 1L
                         next
                     }
                     rest <- paste(cluster[-seq_len(j)], collapse="")
                     if (nzchar(rest))
-                        result[[o$name]] <- rest %as% o$mode
+                        record(o, label, coerceValue(rest, o$mode, label))
                     else if (i == nargs)
-                        stop(es("Short-style option -#{o$short} requires an argument"))
+                        stop(es("Short-style option #{label} requires an argument"))
                     else {
                         if (tokenType(args[i+1]) != "other")
-                            warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option -#{o$short}"))
-                        result[[o$name]] <- args[i+1] %as% o$mode
+                            warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option #{label}"))
+                        record(o, label, coerceValue(args[i+1], o$mode, label))
                         i <- i + 1L
                     }
                     break   # The rest of the cluster was the option's value
                 }
-            } else break    # A positional argument, so stop looking for options
+            } else {
+                positional <- c(positional, args[i])
+            }
             
             i <- i + 1L
         }
         
-        if (nargs >= i)
-            result[[".args"]] <- args[i:nargs]
-        else
-            result[[".args"]] <- character(0)
+        parsed <- list(options=values, labels=labels, args=positional)
         
-        patternMatches <- lapply(.pats, matchPattern, result, .defaults)
-        validPatterns <- !vapply(patternMatches, is.null, logical(1))
-        if (!any(validPatterns))
-            stop("Provided arguments do not match any usage pattern")
+        if (length(.pats) == 0)
+            stop("No usage patterns have been specified for this command", call.=FALSE)
         
-        return (patternMatches[[which(validPatterns)[1]]])
+        matches <- lapply(.pats, matchPattern, parsed, .defaults)
+        failed <- vapply(matches, inherits, logical(1), "arrgMismatch")
+        if (all(failed)) {
+            # Report why each pattern in turn was rejected, so that the user
+            # can see which one they were closest to matching
+            reasons <- vapply(matches, function (m) m$reason, character(1))
+            usage <- paste0("  ", name, " ", vapply(.pats, formatPattern, character(1)))
+            stop(paste(c("Provided arguments do not match any usage pattern:", paste0(usage, ": ", reasons)), collapse="\n"), call.=FALSE)
+        }
+        
+        return (matches[[which(!failed)[1]]])
     }, show = function (con = stdout(), width = getOption("width")) {
         lines <- character(0)
         

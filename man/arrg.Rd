@@ -41,10 +41,11 @@ called.
 Options may be given in long form, as in \code{--times=3} or \verb{--times 3}, or in
 short form, as in \code{-n3} or \verb{-n 3}. Several short-form options may be
 clustered behind a single hyphen, with any option that takes an argument
-coming last, as in \code{-tn3}. Option parsing stops at the first positional
-argument, or at a \verb{--} argument, which is discarded; everything after that
-point is treated as positional, even if it begins with a hyphen. A lone \code{-}
-is always positional, by convention referring to standard input.
+coming last, as in \code{-tn3}. Options and positional arguments may be freely
+interleaved. A \verb{--} argument stops option parsing and is discarded:
+everything after it is treated as positional, even if it begins with a
+hyphen. A lone \code{-} is always positional, by convention referring to
+standard input.
 }
 \examples{
   # A simple parser for a command called "test" with only one option, -h

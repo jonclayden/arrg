@@ -97,9 +97,12 @@ expect_equal(args$parse(c("--","-tn3"))$command, "-tn3")
 expect_false(args$parse(c("--","-tn3"))$time)
 expect_equal(args$parse(c("-t","--","-n5"))$command, "-n5")
 
-# Positional arguments are never expanded as option clusters
-expect_equal(args$parse(c("mycommand","-tn3"))$arg, "-tn3")
-expect_false(args$parse(c("mycommand","-tn3"))$time)
+# Options and positional arguments may be interleaved
+expect_equal(args$parse(c("mycommand","-tn3"))$command, "mycommand")
+expect_true(args$parse(c("mycommand","-tn3"))$time)
+expect_equal(args$parse(c("mycommand","-tn3"))$times, 3L)
+expect_equal(args$parse(c("-t","one","-n","3","two"))$command, "one")
+expect_equal(args$parse(c("-t","one","-n","3","two"))$arg, "two")
 
 # Short-option clusters, with a value attached or detached
 expect_equal(args$parse(c("-tn3","."))$times, 3L)
@@ -125,3 +128,34 @@ expect_equal(hyphenated$parse(c("-o","-"))$out, "-")
 # A value attached with "=" may be empty
 expect_equal(hyphenated$parse("--out=")$out, "")
 expect_equal(hyphenated$parse("--out=x")$out, "x")
+
+# Optional positional arguments that aren't given are absent, not NA
+optional <- arrg("test", opt("v","Be verbose"),
+                 patterns=list(pat("src","dest?",options="v"), pat("rest...?")))
+expect_null(optional$parse("a")$dest)
+expect_equal(optional$parse(c("a","b"))$dest, "b")
+expect_null(optional$parse(character(0))$rest)
+expect_equal(optional$parse("x")$src, "x")
+
+# Required positional arguments cannot follow optional ones
+expect_error(arrg("test", patterns=list(pat("a?","b"))), "cannot follow")
+expect_silent(arrg("test", patterns=list(pat("a","b?"))))
+
+# Extra positional arguments are rejected, not silently dropped
+expect_error(arrg("test", opt("h,help","Help"),
+                  patterns=list(pat(options="h!")))$parse(c("-h","extra")), "too many")
+
+# An invalid value for an option is reported against that option
+typed <- arrg("test", opt("n,times","Count",arg="count",default=1L),
+              opt("f,flag","Boolean",default=TRUE), patterns=list(pat(options="nf")))
+expect_error(typed$parse("--times=abc"), "--times")
+expect_error(typed$parse("--times=abc"), "integer")
+expect_error(typed$parse(c("-n","abc")), "-n")
+expect_error(typed$parse("--flag=maybe"), "logical")
+expect_equal(typed$parse("--flag=TRUE")$flag, TRUE)
+
+# Failure to match reports why each pattern in turn was rejected
+expect_error(args$parse(c("-h","-t")), "do not match any usage pattern")
+expect_error(args$parse(c("-h","-t")), "--install")     # each pattern is listed
+expect_error(optional$parse("-v"), "is required")       # with its own reason
+expect_error(arrg("test")$parse(character(0)), "No usage patterns")
