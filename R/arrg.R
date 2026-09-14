@@ -200,25 +200,53 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         if (!is.null(header))
             lines <- c(lines, strwrap(header, width), "")
         if (length(.pats) > 0) {
+            # Continuation lines are normally aligned under the first pattern
+            # element, but that leaves too little room if the command name is
+            # long relative to the width available
             nameWidth <- nchar(name, "width")
-            lines <- c(lines, "Usage:", unlist(lapply(.pats, function(p) strwrap(paste(name, formatPattern(p)), width, indent=2L, exdent=3L+nameWidth))), "")
+            exdent <- min(3L + nameWidth, max(4L, width %/% 2L))
+            lines <- c(lines, "Usage:", unlist(lapply(.pats, function(p) strwrap(paste(name, formatPattern(p)), width, indent=2L, exdent=exdent))), "")
         }
         if (length(.opts) > 0) {
+            # A description column narrower than this isn't worth having
+            minDescWidth <- 20L
+            
             arg <- optField(.opts, "arg", logical(1))
             argname <- optField(.opts, "argname")
             shortStrings <- ifelse(is.na(.short), NA, paste0("-", .short, ifelse(arg, paste0(" <",argname,">"), "")))
             longStrings <- ifelse(is.na(.long), NA, paste0("--", .long, ifelse(arg, paste0("=<",argname,">"), "")))
             both <- !is.na(shortStrings) & !is.na(longStrings)
             optStrings <- ifelse(both, paste(shortStrings,longStrings,sep=", "), ifelse(is.na(shortStrings), longStrings, shortStrings))
-            optWidths <- nchar(optStrings, "width")
-            maxWidth <- max(optWidths)
+            
+            # An option label taking up too much of the line has its short and
+            # long forms split across two lines, which narrows the label column
+            split <- both & nchar(optStrings,"width") > 0.6 * width
+            optLines <- lapply(seq_along(.opts), function (i) {
+                if (split[i]) c(paste0(shortStrings[i],","), longStrings[i]) else optStrings[i]
+            })
+            maxWidth <- max(vapply(optLines, function (l) max(nchar(l,"width")), numeric(1)))
+            
+            # If the labels are wide enough to squeeze out the description
+            # column altogether, descriptions go underneath them instead
+            descWidth <- width - maxWidth - 5
+            stack <- descWidth < minDescWidth
             
             lines <- c(lines, "Options:")
             for (i in seq_along(.opts)) {
-                descLines <- strwrap(.opts[[i]]$description, width-maxWidth-5)
-                lines <- c(lines, paste0("  ", optStrings[i], strrep(" ", maxWidth+3-optWidths[i]), descLines[1]))
-                if (length(descLines) > 1)
-                    lines <- c(lines, paste0(strrep(" ", 5+maxWidth), descLines[-1]))
+                label <- optLines[[i]]
+                descLines <- strwrap(.opts[[i]]$description, max(if (stack) width-6L else descWidth, minDescWidth))
+                if (stack)
+                    lines <- c(lines, paste0("  ", label), paste0("      ", descLines))
+                else {
+                    # Any label line but the last stands on its own, with the
+                    # description starting alongside the last one
+                    last <- length(label)
+                    if (last > 1)
+                        lines <- c(lines, paste0("  ", label[-last]))
+                    lines <- c(lines, paste0("  ", label[last], strrep(" ", maxWidth+3-nchar(label[last],"width")), descLines[1]))
+                    if (length(descLines) > 1)
+                        lines <- c(lines, paste0(strrep(" ", 5+maxWidth), descLines[-1]))
+                }
             }
             lines <- c(lines, "")
         }

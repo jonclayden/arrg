@@ -204,3 +204,36 @@ expect_equal(result$c, 3.5)
 # as a defaulted positional argument called "options"
 expect_error(pat(options="h!"), 'now called "\\.options"')
 expect_equal(attr(pat(.options="h!"), "options"), "h!")
+
+# Usage output adapts to the width available, rather than letting the option
+# labels squeeze the description column down to one word per line
+usageLines <- function (parser, width) {
+    con <- textConnection("out", "w", local=TRUE)
+    parser$show(con, width=width)
+    close(con)
+    out
+}
+
+# No line exceeds the requested width, at any width where the labels do fit
+for (w in c(40, 50, 60, 70, 80, 100))
+    expect_true(all(nchar(usageLines(args, w), "width") <= w))
+
+# A label taking up more than 60% of the width is split across two lines
+wide <- arrg("build",
+             opt("o,output-directory", "Directory in which to place the built artefacts", arg="directory"),
+             opt("v,verbose", "Print more information"),
+             patterns=list(pat("target?", .options="ov")))
+expect_false(any(usageLines(wide, 80) == "  -o <directory>,"))
+expect_true(any(usageLines(wide, 70) == "  -o <directory>,"))
+
+# If there is still no room for a description column, descriptions are placed
+# below their labels, and remain wrapped to several words per line
+expect_true(any(grepl("^      Directory in which", usageLines(wide, 45))))
+# Three description lines in total, rather than the eleven that one word per
+# line would produce
+expect_equal(sum(grepl("^      \\S", usageLines(wide, 45))), 3L)
+
+# A long command name does not push usage continuation lines off the page
+longName <- arrg("run-the-integration-test-suite", opt("n,times","Repeat count",arg="count"),
+                 patterns=list(pat("suite","case...?",.options="n")))
+expect_true(all(nchar(usageLines(longName, 40), "width") <= 40))
