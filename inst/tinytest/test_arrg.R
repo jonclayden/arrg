@@ -237,3 +237,28 @@ expect_equal(sum(grepl("^      \\S", usageLines(wide, 45))), 3L)
 longName <- arrg("run-the-integration-test-suite", opt("n,times","Repeat count",arg="count"),
                  patterns=list(pat("suite","case...?",.options="n")))
 expect_true(all(nchar(usageLines(longName, 40), "width") <= 40))
+
+# opt() and pat() are supplied by arrg() itself rather than found in scope, so
+# that a script can call arrg::arrg() without attaching the package. Local
+# definitions are therefore masked, which is what makes this testable here
+mechanism <- local({
+    opt <- function (...) stop("the local opt() should not be used")
+    pat <- function (...) stop("the local pat() should not be used")
+    arrg("test", opt("v","Be verbose"), patterns=list(pat("x", .options="v")))
+})
+expect_true(mechanism$parse(c("-v","q"))$v)
+expect_equal(mechanism$parse(c("-v","q"))$x, "q")
+
+# Everything else in a specification still resolves in the calling scope
+localDesc <- "Described in the caller"
+expect_stdout(arrg("test", opt("v", localDesc),
+                   patterns=list(pat(.options="v")))$show(), localDesc)
+
+# Specifications built ahead of time, and do.call(), continue to work
+prebuilt <- list(opt("a,alpha","A"), opt("b,beta","B"))
+spliced <- do.call(arrg, c(list("test"), prebuilt, list(patterns=list(pat(.options="ab")))))
+expect_true(spliced$parse("-ab")$alpha)
+expect_true(spliced$parse("-ab")$beta)
+
+patternList <- list(pat("x", .options="v"))
+expect_equal(arrg("test", opt("v","V"), patterns=patternList)$parse(c("-v","q"))$x, "q")

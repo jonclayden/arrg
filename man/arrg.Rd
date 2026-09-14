@@ -47,9 +47,19 @@ everything after it is treated as positional, even if it begins with a
 hyphen. A lone \code{-} is always positional, by convention referring to
 standard input.
 }
+\note{
+The option and pattern specifications given to this function are
+evaluated with \code{\link[=opt]{opt()}} and \code{\link[=pat]{pat()}} in scope, so a script may call
+\code{arrg::arrg()} without attaching the package using \code{library()}, and
+without namespacing each of those nested calls.
+}
 \examples{
   # A simple parser for a command called "test" with only one option, -h
   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
+  
+  # The same, without attaching the package: opt() and pat() are still
+  # available within the call itself
+  p <- arrg::arrg("test", opt("h","Print help"), patterns=list(pat(.options="h!")))
   
   # Print out usage information
   p$show()

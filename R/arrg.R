@@ -59,11 +59,21 @@ coerceValue <- function (value, mode, what)
 #'   patterns. Text will be printed to the specified connection, default
 #'   [stdout()], and wrapped to the width given, which defaults to the value of
 #'   the standard `width` option.
+#' 
+#' @note The option and pattern specifications given to this function are
+#'   evaluated with [opt()] and [pat()] in scope, so a script may call
+#'   `arrg::arrg()` without attaching the package using `library()`, and
+#'   without namespacing each of those nested calls.
+#' 
 #' @seealso [opt()], [pat()]
 #' 
 #' @examples
 #'   # A simple parser for a command called "test" with only one option, -h
 #'   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
+#'   
+#'   # The same, without attaching the package: opt() and pat() are still
+#'   # available within the call itself
+#'   p <- arrg::arrg("test", opt("h","Print help"), patterns=list(pat(.options="h!")))
 #'   
 #'   # Print out usage information
 #'   p$show()
@@ -74,7 +84,14 @@ coerceValue <- function (value, mode, what)
 #' @export
 arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
 {
-    .opts <- list(...)
+    # The specifications are evaluated with opt() and pat() in scope, so that
+    # the package need not be attached; anything else in them is resolved in
+    # the caller's environment, as it would be normally
+    scope <- list(opt=opt, pat=pat)
+    caller <- parent.frame()
+    .opts <- lapply(as.list(substitute(list(...)))[-1], eval, envir=scope, enclos=caller)
+    patterns <- eval(substitute(patterns), envir=scope, enclos=caller)
+    
     if (!all(vapply(.opts, inherits, logical(1), "arrgOption")))
         stop("Options must be specified using the opt() function")
     
