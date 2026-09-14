@@ -41,9 +41,9 @@ parser <- arrg("test",
     opt("t,time", "Print the overall run-time once the test is completed"),
     opt("install", "Install the code before testing it"),
     patterns=list(
-        pat(options="h!"),
-        pat("command", "arg...?", options="nt"),
-        pat("path?", options="n,t,install")),
+        pat(.options="h!"),
+        pat("command", "arg...?", .options="nt"),
+        pat("path?", .options="n,t,install")),
     header="Test your code",
     footer="Run the test on the code at the specified path (default \".\"), or run a specific command.")
 ```
