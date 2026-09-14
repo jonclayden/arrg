@@ -12,16 +12,18 @@ tokenType <- function (arg)
         "short"
 }
 
-# Coerce a value given for an option to the mode of the option's default,
-# reporting any failure in terms of the option rather than leaving R to emit a
-# bare coercion warning. Coercion to logical mode fails silently, so the result
-# is tested rather than a warning being caught
-coerceValue <- function (value, mode, label)
+# Coerce a value given for an option or positional argument to the mode of its
+# default, reporting any failure in terms of that option or argument rather
+# than leaving R to emit a bare coercion warning. Coercion to logical mode
+# fails silently, so the result is tested rather than a warning being caught
+coerceValue <- function (value, mode, what)
 {
-    result <- withCallingHandlers({ storage.mode(value) <- mode; value },
-                                  warning=function (cond) invokeRestart("muffleWarning"))
-    if (is.na(result) && !is.na(value))
-        stop(es("Value \"#{value}\" is not valid for option #{label}, which takes an argument of type #{mode}"))
+    # Note that the replacement function is called directly, rather than
+    # assigning to "value", so that the original is left intact to compare to
+    result <- suppressWarnings(`storage.mode<-`(value, mode))
+    invalid <- which(is.na(result) & !is.na(value))
+    if (length(invalid) > 0)
+        stop(es("Value \"#{value[invalid[1]]}\" is not valid for #{what}, which takes a value of type #{mode}"))
     return (result)
 }
 
