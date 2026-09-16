@@ -462,3 +462,28 @@ expect_equal(arrg("mycommand", opt("v","V"))$name, "mycommand")
 # run()'s execute argument must be a single logical value
 expect_error(runner$run({ NULL }, execute="function"), "must be TRUE, FALSE or NA")
 expect_error(runner$run({ NULL }, execute=c(TRUE,FALSE)), "must be TRUE, FALSE or NA")
+
+# Forgetting the command name leaves an option or pattern in its place, which
+# is caught rather than silently producing nonsense
+expect_error(arrg(opt("v,verbose","Be verbose")), "appears to have been omitted")
+expect_error(arrg(pat("x")), "appears to have been omitted")
+expect_error(arrg(), "must be given as the first argument")
+expect_error(arrg(1L), "single non-empty string")
+expect_error(arrg(c("a","b")), "single non-empty string")
+expect_error(arrg(""), "single non-empty string")
+expect_error(arrg(NA_character_), "single non-empty string")
+
+# A name given by variable or by full argument name still works
+commandName <- "tally"
+expect_equal(arrg(commandName, opt("l","Lines"))$name, "tally")
+expect_equal(arrg(name="tally", opt("l","Lines"))$name, "tally")
+
+# The parser is classed, and prints its usage rather than its own contents
+printable <- arrg("tally", opt("l,lines","Count lines"), header="Count things")
+expect_true(inherits(printable, "arrgParser"))
+expect_stdout(print(printable), "Usage")
+expect_stdout(print(printable), "Count things")
+expect_stdout(print(printable, width=40), "Usage")
+invisible(capture.output(visibility <- withVisible(print(printable))))
+expect_false(visibility$visible)
+expect_identical(capture.output(print(printable)), capture.output(printable$show()))
