@@ -21,9 +21,11 @@ default, as for \code{\link[=opt]{opt()}}.}
 \item{.options}{A string naming the long or short labels of options that can
 be specified with this pattern, comma-separated. Short form options may be
 given in one letter cluster for convenience. Options are only required if
-followed by an exclamation mark. The leading period distinguishes this
-parameter from the positional arguments passed in \code{...}, whose names can
-never contain one.}
+followed by an exclamation mark. Alternatively \code{TRUE}, meaning every
+option that the command declares, all of them optional, except any that
+\code{\link[=arrg]{arrg()}} generated itself, such as an automatic help option. The leading
+period distinguishes this parameter from the positional arguments passed
+in \code{...}, whose names can never contain one.}
 }
 \value{
 A list capturing the positional arguments, with options in an
@@ -50,8 +52,8 @@ and no unexpected options are included.
   pat("command", "arg...?", .options="nt")
   
   # A pattern with one optional argument, which defaults to "." if it is
-  # not given
-  pat(path=".")
+  # not given, and which accepts every option the command declares
+  pat(path=".", .options=TRUE)
 
 }
 \seealso{

@@ -28,7 +28,7 @@ expect_equal(p3$arg, c("one","two"))
 # Specification errors: bad options, syntax errors, too many variable-length arguments
 expect_error(arrg("test", opt("h")), "description")
 expect_error(arrg("test", opt("h,help,he", "empty")), "too many labels")
-expect_error(arrg("test", patterns=list(pat(.options="h"))), "options")
+expect_error(arrg("test", patterns=list(pat(.options="z"))), "options")
 expect_error(arrg("test", patterns=list(pat("command!"))), "Format")
 expect_error(arrg("test", patterns=list(pat("source...", "target..."))), "multiple values")
 
@@ -158,7 +158,6 @@ expect_equal(typed$parse("--flag=TRUE")$flag, TRUE)
 expect_error(args$parse(c("-h","-t")), "do not match any usage pattern")
 expect_error(args$parse(c("-h","-t")), "--install")     # each pattern is listed
 expect_error(optional$parse("-v"), "is required")       # with its own reason
-expect_error(arrg("test")$parse(character(0)), "No usage patterns")
 
 # A positional argument given as a named element takes the name as its
 # specification and the value as a default, and is thereby optional
@@ -222,7 +221,7 @@ for (w in c(40, 50, 60, 70, 80, 100))
 wide <- arrg("build",
              opt("o,output-directory", "Directory in which to place the built artefacts", arg="directory"),
              opt("v,verbose", "Print more information"),
-             patterns=list(pat("target?", .options="ov")))
+             patterns=list(pat("target?", .options="ov")), help=FALSE)
 expect_false(any(usageLines(wide, 80) == "  -o <directory>,"))
 expect_true(any(usageLines(wide, 70) == "  -o <directory>,"))
 
@@ -235,7 +234,7 @@ expect_equal(sum(grepl("^      \\S", usageLines(wide, 45))), 3L)
 
 # A long command name does not push usage continuation lines off the page
 longName <- arrg("run-the-integration-test-suite", opt("n,times","Repeat count",arg="count"),
-                 patterns=list(pat("suite","case...?",.options="n")))
+                 patterns=list(pat("suite","case...?",.options="n")), help=FALSE)
 expect_true(all(nchar(usageLines(longName, 40), "width") <= 40))
 
 # opt() and pat() are supplied by arrg() itself rather than found in scope, so
@@ -363,3 +362,72 @@ bodyList <- list(function (args) args$path)
 expect_equal(runner$run(bodyList[[1]], args="/var", mode="script", exit=FALSE), "/var")
 expect_error(runner$run("not a function"), "must be a function")
 expect_error(runner$run(42), "must be a function")
+
+# A help option, and a usage pattern for it, are provided unless the command
+# declares one of its own
+autoHelp <- arrg("test", opt("v,verbose","Be verbose"))
+expect_true(autoHelp$parse("--help")$help)
+expect_true(autoHelp$parse("-h")$help)
+expect_stdout(autoHelp$show(), "--help")
+expect_stdout(autoHelp$show(), "test -h")
+expect_error(arrg("test", opt("v","V"), help=FALSE)$parse("--help"), "Unexpected")
+
+# One the command declares itself is left alone, and not duplicated, whether
+# it is recognised by its short or its long form
+ownHelp <- arrg("test", opt("h,help","My own help"), patterns=list(pat(.options="h!")))
+expect_stdout(ownHelp$show(), "My own help")
+expect_false(any(grepl("Display this usage", capture.output(ownHelp$show()))))
+expect_true(arrg("test", opt("h,hidden","Hidden"))$parse("-h")$hidden)
+expect_true(arrg("test", opt("help","Long only"))$parse("--help")$help)
+
+# With no pattern given, one is generated that accepts all of the command's
+# options and any number of positional arguments, which are named "args"
+generated <- arrg("test", opt("v,verbose","Be verbose"),
+                  opt("n,times","Count",arg="count",default=1L))
+expect_equal(generated$parse(c("-v","-n2","a","b"))$args, c("a","b"))
+expect_true(generated$parse(c("-v","a"))$verbose)
+expect_equal(generated$parse(character(0))$times, 1L)
+expect_null(generated$parse(character(0))$args)
+expect_error(arrg("test", opt("a,args","Clash")), "named \"args\"")
+
+# ".options=TRUE" means every option the command declares, all optional, but
+# not one that was generated for it, which keeps its own pattern
+allOpts <- arrg("test", opt("v,verbose","V"), opt("n,times","C",arg="count",default=1L),
+                patterns=list(pat("x?", .options=TRUE)))
+expect_true(allOpts$parse(c("-v","q"))$verbose)
+expect_equal(allOpts$parse(c("-n","3","q"))$times, 3L)
+expect_stdout(allOpts$show(), "[-v]")
+expect_true(allOpts$parse("-h")$help)
+expect_false(any(grepl("\\[-h\\]", capture.output(allOpts$show()))))
+
+# A single pattern may be given in place of a list of them
+expect_equal(arrg("one", opt("v","V"), patterns=pat("file", .options=TRUE))$parse("f")$file, "f")
+expect_error(arrg("one", patterns="notapattern"), "pat\\(\\) function")
+
+# A generated help option takes no part in the function returned by run()
+expect_equal(names(formals(generated$run({ NULL }, mode="function"))),
+             c("args","verbose","times"))
+
+# A cluster in .options formats each of its options, not just the first
+cluster <- arrg("test", opt("n,times","Count",arg="count",default=1L),
+                opt("t,time","Time it"), opt("install","Install"),
+                patterns=list(pat("path?", .options="nt,install")), help=FALSE)
+expect_true(any(grepl("test [-n <count>] [-t] [--install] [<path>]",
+                      capture.output(cluster$show()), fixed=TRUE)))
+allForm <- arrg("test", opt("n,times","C",arg="count",default=1L), opt("t,time","T"),
+                patterns=list(pat("x", .options=TRUE)), help=FALSE)
+expect_true(any(grepl("test [-n <count>] [-t] <x>",
+                      capture.output(allForm$show()), fixed=TRUE)))
+
+# A generated help option is listed first, matching the position of its
+# usage pattern, and its description may be overridden with a string
+firstHelp <- capture.output(arrg("test", opt("v,verbose","Be verbose"))$show())
+expect_equal(trimws(firstHelp[grep("^Options:$", firstHelp) + 1L]),
+             "-h, --help      Display this usage information and exit")
+expect_stdout(arrg("test", opt("v","V"), help="Show help and exit.")$show(),
+              "Show help and exit.")
+expect_false(any(grepl("Display this usage",
+                       capture.output(arrg("test", opt("v","V"),
+                                           help="Show help and exit.")$show()))))
+expect_error(arrg("test", opt("v","V"), help=1L), "must be TRUE, FALSE, or a single string")
+expect_error(arrg("test", opt("v","V"), help=c("a","b")), "single string")

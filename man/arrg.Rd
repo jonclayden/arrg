@@ -4,7 +4,7 @@
 \alias{arrg}
 \title{Create an argument parser}
 \usage{
-arrg(name, ..., patterns = list(), header = NULL, footer = NULL)
+arrg(name, ..., patterns = list(), help = TRUE, header = NULL, footer = NULL)
 }
 \arguments{
 \item{name}{The name of the command.}
@@ -12,8 +12,16 @@ arrg(name, ..., patterns = list(), header = NULL, footer = NULL)
 \item{...}{Option specifications. See \code{\link[=opt]{opt()}} for details.}
 
 \item{patterns}{A list of usage patterns that are valid for the command,
-each specifying acceptable options and positional arguments. See \code{\link[=pat]{pat()}}
-for details.}
+each specifying acceptable options and positional arguments, or a single
+such pattern. See \code{\link[=pat]{pat()}} for details. If none is given, one is generated
+that accepts all of the command's options and any number of positional
+arguments, which are named \code{args}.}
+
+\item{help}{Whether to provide a help option, and a usage pattern for it,
+if the command does not specify one of its own. A string may be given
+instead of \code{TRUE}, and is used as the option's description. A generated
+option of this kind is listed first, and takes no part in a pattern's
+\code{.options=TRUE}, nor in the function returned by the \code{run} method.}
 
 \item{header, footer}{Optional paragraphs of text to be prepended and/or
 appended to the usage text produced by the \code{show} method of the return

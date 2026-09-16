@@ -22,9 +22,11 @@
 #' @param .options A string naming the long or short labels of options that can
 #'   be specified with this pattern, comma-separated. Short form options may be
 #'   given in one letter cluster for convenience. Options are only required if
-#'   followed by an exclamation mark. The leading period distinguishes this
-#'   parameter from the positional arguments passed in `...`, whose names can
-#'   never contain one.
+#'   followed by an exclamation mark. Alternatively `TRUE`, meaning every
+#'   option that the command declares, all of them optional, except any that
+#'   [arrg()] generated itself, such as an automatic help option. The leading
+#'   period distinguishes this parameter from the positional arguments passed
+#'   in `...`, whose names can never contain one.
 #' @return A list capturing the positional arguments, with options in an
 #'   attribute. This will not usually be used directly, but passed to [arrg()].
 #' @seealso [arrg()]
@@ -39,8 +41,8 @@
 #'   pat("command", "arg...?", .options="nt")
 #'   
 #'   # A pattern with one optional argument, which defaults to "." if it is
-#'   # not given
-#'   pat(path=".")
+#'   # not given, and which accepts every option the command declares
+#'   pat(path=".", .options=TRUE)
 #' 
 #' @author Jon Clayden
 #' @export
@@ -51,7 +53,7 @@ pat <- function (..., .options = NULL)
     # otherwise now be quietly taken as a positional argument with a default
     if ("options" %in% names(args))
         stop("The \"options\" argument to pat() is now called \".options\"")
-    return (structure(args, options=.options))
+    return (structure(args, options=.options, class="arrgPatternSpec"))
 }
 
 # An indication that a pattern did not match, with the reason why, as distinct
@@ -61,7 +63,7 @@ mismatch <- function (reason)
     return (structure(list(reason=reason), class="arrgMismatch"))
 }
 
-resolvePattern <- function (spec, opts)
+resolvePattern <- function (spec, opts, generated = logical(length(opts)))
 {
     optShort <- optField(opts, "short")
     optLong <- optField(opts, "long")
@@ -114,7 +116,26 @@ resolvePattern <- function (spec, opts)
             stop("Required positional arguments cannot follow optional ones")
     }
     
-    if (!is.null(attr(spec, "options"))) {
+    # A row of option information, formatted in whichever style was asked for
+    optRow <- function (index, useShort, required) {
+        # Note that useShort must match the length of index, since ifelse()
+        # returns a value shaped like its test rather than its branches
+        useShort <- rep_len(useShort, length(index))
+        labels <- ifelse(useShort, paste0("-",optShort[index]), paste0("--",optLong[index]))
+        formats <- paste0(labels, ifelse(optArg[index],
+                                         ifelse(useShort, paste0(" <",optArgname[index],">"),
+                                                          paste0("=<",optArgname[index],">")),
+                                         ""))
+        data.frame(name=optName[index], label=labels, format=formats, required=required, stringsAsFactors=FALSE)
+    }
+    
+    if (isTRUE(attr(spec, "options"))) {
+        # Every option the command declares, other than any generated for it,
+        # preferring the short form of each where there is one
+        index <- which(!generated)
+        if (length(index) > 0)
+            optInfo <- rbind(optInfo, optRow(index, !is.na(optShort[index]), FALSE))
+    } else if (!is.null(attr(spec, "options"))) {
         labels <- trimws(unlist(ore_split(",", attr(spec, "options"))))
         labels <- labels[nzchar(labels)]
         
@@ -122,9 +143,7 @@ resolvePattern <- function (spec, opts)
             longMatch <- ore_search("^([\\w-]+)(!)?$", label)
             index <- if (is.null(longMatch)) NA_integer_ else match(longMatch[,1], optLong)
             if (!is.na(index)) {
-                optLabels <- paste0("--", optLong[index])
-                format <- paste0(optLabels, ifelse(optArg[index], paste0("=<",optArgname[index],">"), ""))
-                required <- !is.na(longMatch[,2])
+                optInfo <- rbind(optInfo, optRow(index, FALSE, !is.na(longMatch[,2])))
             } else {
                 # Not a known long-form label, so treat it as a cluster of
                 # short-form ones, each optionally followed by an exclamation
@@ -134,11 +153,8 @@ resolvePattern <- function (spec, opts)
                 if (!all(shortMatches[,1] %in% optShort))
                     stop("Pattern uses options not included in the main specification")
                 index <- match(shortMatches[,1], optShort)
-                optLabels <- paste0("-", optShort[index])
-                format <- paste0(optLabels, ifelse(optArg[index], paste0(" <",optArgname[index],">"), ""))
-                required <- !is.na(shortMatches[,2])
+                optInfo <- rbind(optInfo, optRow(index, TRUE, !is.na(shortMatches[,2])))
             }
-            optInfo <- rbind(optInfo, data.frame(name=optName[index], label=optLabels, format=format, required=required, stringsAsFactors=FALSE))
         }
     }
     

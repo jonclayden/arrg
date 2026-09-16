@@ -46,8 +46,15 @@ coerceValue <- function (value, mode, what)
 #' @param name The name of the command.
 #' @param ... Option specifications. See [opt()] for details.
 #' @param patterns A list of usage patterns that are valid for the command,
-#'   each specifying acceptable options and positional arguments. See [pat()]
-#'   for details.
+#'   each specifying acceptable options and positional arguments, or a single
+#'   such pattern. See [pat()] for details. If none is given, one is generated
+#'   that accepts all of the command's options and any number of positional
+#'   arguments, which are named `args`.
+#' @param help Whether to provide a help option, and a usage pattern for it,
+#'   if the command does not specify one of its own. A string may be given
+#'   instead of `TRUE`, and is used as the option's description. A generated
+#'   option of this kind is listed first, and takes no part in a pattern's
+#'   `.options=TRUE`, nor in the function returned by the `run` method.
 #' @param header,footer Optional paragraphs of text to be prepended and/or
 #'   appended to the usage text produced by the `show` method of the return
 #'   value. Typically used to introduce the command or give brief guidance on
@@ -117,7 +124,7 @@ coerceValue <- function (value, mode, what)
 #'   p$parse("-h")
 #' @author Jon Clayden
 #' @export
-arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
+arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, footer = NULL)
 {
     # The specifications are evaluated with opt() and pat() in scope, so that
     # the package need not be attached; anything else in them is resolved in
@@ -130,6 +137,24 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
     if (!all(vapply(.opts, inherits, logical(1), "arrgOption")))
         stop("Options must be specified using the opt() function")
     
+    # A help option is provided unless the command specifies one of its own,
+    # and comes first, to match the position of its usage pattern. It is
+    # marked as generated, which excludes it from a pattern's ".options=TRUE"
+    # and from the function that the run method returns
+    if (isTRUE(help) || isFALSE(help))
+        description <- "Display this usage information and exit"
+    else if (is.character(help) && length(help) == 1L && !is.na(help)) {
+        description <- help
+        help <- TRUE
+    } else
+        stop("The help argument must be TRUE, FALSE, or a single string")
+    
+    .generated <- rep(FALSE, length(.opts))
+    if (help && !("h" %in% optField(.opts,"short")) && !("help" %in% optField(.opts,"long"))) {
+        .opts <- c(list(opt("h,help", description)), .opts)
+        .generated <- c(TRUE, .generated)
+    }
+    
     .short <- optField(.opts, "short")
     .long <- optField(.opts, "long")
     .names <- optField(.opts, "name")
@@ -140,13 +165,29 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
     if (length(duplicates(.long)) > 0)
         stop("Duplicate long-form option label(s): ", paste(duplicates(.long),collapse=", "))
     
+    # A single pattern may be given in place of a list of them
+    if (inherits(patterns, "arrgPatternSpec"))
+        patterns <- list(patterns)
+    if (!all(vapply(patterns, inherits, logical(1), "arrgPatternSpec")))
+        stop("Usage patterns must be specified using the pat() function")
+    
+    # With no pattern given, the command takes all of its own options and any
+    # number of positional arguments
+    if (length(patterns) == 0L) {
+        if ("args" %in% .names)
+            stop("A default usage pattern cannot be generated, because an option is named \"args\"")
+        patterns <- list(pat("args...?", .options=TRUE))
+    }
+    if (any(.generated))
+        patterns <- c(list(pat(.options="h!")), patterns)
+    
     # Options are fixed once the parser is created, so resolve patterns and
     # collect default values up front rather than on every call to parse()
-    .pats <- lapply(patterns, resolvePattern, .opts)
+    .pats <- lapply(patterns, resolvePattern, .opts, .generated)
     .defaults <- structure(lapply(.opts, "[[", "default"), names=.names)
     
     # Every name that any pattern could contribute to a parsed result
-    .allNames <- unique(c(.names, unlist(lapply(.pats, function (p) p$args$name))))
+    .allNames <- unique(c(.names[!.generated], unlist(lapply(.pats, function (p) p$args$name))))
     
     # An option's label, preferring the long form, for use in messages
     .label <- function (i) if (is.na(.long[i])) paste0("-",.short[i]) else paste0("--",.long[i])
@@ -251,9 +292,6 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         
         parsed <- list(options=values, labels=labels, args=positional)
         
-        if (length(.pats) == 0)
-            stop("No usage patterns have been specified for this command", call.=FALSE)
-        
         return (.match(parsed))
     }
     
@@ -326,7 +364,7 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
         argNames <- unique(unlist(lapply(.pats, function (p) p$args$name)))
         if (is.null(argNames))
             argNames <- character(0)
-        wrapperNames <- c(argNames, .names)
+        wrapperNames <- c(argNames, .names[!.generated])
         
         # Every formal is given a default, NULL standing for "not supplied",
         # so that a missing required argument is reported by the pattern
@@ -337,8 +375,8 @@ arrg <- function (name, ..., patterns = list(), header = NULL, footer = NULL)
             for (p in .pats)
                 if (!is.null(p$defaults[[argNames[i]]]))
                     defaults[[i]] <- p$defaults[[argNames[i]]]
-        for (i in seq_along(.names))
-            defaults[[length(argNames)+i]] <- .defaults[[.names[i]]]
+        for (i in seq_along(wrapperNames[-seq_along(argNames)]))
+            defaults[[length(argNames)+i]] <- .defaults[[wrapperNames[length(argNames)+i]]]
         
         wrapper <- function () .invoke(body, environment(), match.call())
         if (length(wrapperNames) > 0L)
