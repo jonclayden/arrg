@@ -517,5 +517,14 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         return (invisible(invokeBody(body, parsed, .allNames)))
     }
     
-    list(name = name, parse = .parse, show = .show, run = .run)
+    structure(list(name = name, parse = .parse, show = .show, run = .run),
+              class = "arrgParser")
+}
+
+#' @rdname arrg
+#' @export
+print.arrgParser <- function (x, ...)
+{
+    x$show(...)
+    invisible(x)
 }
