@@ -71,7 +71,8 @@ optDescription <- function (o)
 #'   appended to the usage text produced by the `show` method of the return
 #'   value. Typically used to introduce the command or give brief guidance on
 #'   usage.
-#' @return A list with function elements
+#' @return A list with elements
+#' * `name`: The name of the command, as given above.
 #' * `parse(args)`: Parse the character vector of arguments passed in, or by
 #'   default, the value of `commandArgs(trailingOnly=TRUE)`.
 #' * `show(con, width)`: Print a usage summary, detailing the valid options and
@@ -467,5 +468,5 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         return (invisible(invokeBody(body, parsed, .allNames)))
     }
     
-    list(parse = .parse, show = .show, run = .run)
+    list(name = name, parse = .parse, show = .show, run = .run)
 }

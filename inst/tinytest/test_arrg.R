@@ -455,3 +455,6 @@ narrowDefault <- capture.output(arrg("t", opt("n,times","Run the test the specif
                                               arg="count", default=1L), help=FALSE)$show(width=50))
 expect_true(any(grepl("[default 1]", narrowDefault, fixed=TRUE)))
 expect_true(all(nchar(narrowDefault, "width") <= 50))
+
+# The parser exposes the name of the command it was created for
+expect_equal(arrg("mycommand", opt("v","V"))$name, "mycommand")

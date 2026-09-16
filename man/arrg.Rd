@@ -29,8 +29,9 @@ value. Typically used to introduce the command or give brief guidance on
 usage.}
 }
 \value{
-A list with function elements
+A list with elements
 \itemize{
+\item \code{name}: The name of the command, as given above.
 \item \code{parse(args)}: Parse the character vector of arguments passed in, or by
 default, the value of \code{commandArgs(trailingOnly=TRUE)}.
 \item \code{show(con, width)}: Print a usage summary, detailing the valid options and
