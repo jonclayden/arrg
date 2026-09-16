@@ -4,7 +4,8 @@
 # as scripts, which is generally what is wanted
 beingSourced <- function ()
 {
-    isSource <- function (call) {
+    isSource <- function (call)
+    {
         fun <- call[[1]]
         if (is.name(fun))
             as.character(fun) %in% c("source", "sys.source")
@@ -20,7 +21,8 @@ beingSourced <- function ()
 # them into a top-level variable called "argv"
 scriptArgs <- function ()
 {
-    if (exists("argv", envir=globalenv(), inherits=FALSE)) {
+    if (exists("argv", envir=globalenv(), inherits=FALSE))
+    {
         argv <- get("argv", envir=globalenv())
         if (is.character(argv))
             return (argv)
@@ -65,7 +67,8 @@ invokeBody <- function (body, parsed, allNames)
 # unless it has to be, so that a block is never run just to identify it
 resolveBody <- function (expr, envir)
 {
-    if (is.call(expr) && identical(expr[[1]], quote(`{`))) {
+    if (is.call(expr) && identical(expr[[1]], quote(`{`)))
+    {
         fun <- function () NULL
         body(fun) <- expr
         environment(fun) <- envir

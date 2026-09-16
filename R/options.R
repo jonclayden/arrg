@@ -57,7 +57,8 @@ opt <- function (label, description, arg = FALSE, default = NULL)
         stop("Too few or too many labels for option")
     
     argname <- NA_character_
-    if (is.character(arg)) {
+    if (is.character(arg))
+    {
         if (length(arg) != 1L || is.na(arg))
             stop("An option's argument name must be a single string")
         argname <- arg
@@ -73,16 +74,22 @@ opt <- function (label, description, arg = FALSE, default = NULL)
     # Specifying a default implies that the option takes an argument. Storing
     # each option separately (rather than in a shared data frame) means that
     # defaults keep their own modes, whatever other options are specified
-    if (!is.null(default)) {
+    if (!is.null(default))
+    {
         arg <- TRUE
         mode <- storage.mode(default)
-    } else if (arg) {
+    }
+    else if (arg)
+    {
         default <- NA_character_
         mode <- "character"
-    } else {
+    }
+    else
+    {
         default <- FALSE
         mode <- "logical"
     }
+    
     if (arg && is.na(argname))
         argname <- name
     

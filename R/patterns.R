@@ -80,14 +80,16 @@ resolvePattern <- function (spec, opts, generated = logical(length(opts)))
     # argument information, so that each keeps its own mode
     argDefaults <- list()
     
-    if (length(spec) > 0) {
+    if (length(spec) > 0)
+    {
         # An argument given as a named element takes its format from the name
         # and its default value from the element itself; one given unnamed is
         # just the format, and has no default
         defaulted <- if (is.null(names(spec))) logical(length(spec)) else nzchar(names(spec))
         formats <- character(length(spec))
         formats[defaulted] <- names(spec)[defaulted]
-        if (any(!defaulted)) {
+        if (any(!defaulted))
+        {
             unnamed <- spec[!defaulted]
             if (!all(vapply(unnamed, function (x) is.character(x) && length(x) == 1L, logical(1))))
                 stop("Format of positional arguments is invalid")
@@ -117,7 +119,8 @@ resolvePattern <- function (spec, opts, generated = logical(length(opts)))
     }
     
     # A row of option information, formatted in whichever style was asked for
-    optRow <- function (index, useShort, required) {
+    optRow <- function (index, useShort, required)
+    {
         # Note that useShort must match the length of index, since ifelse()
         # returns a value shaped like its test rather than its branches
         useShort <- rep_len(useShort, length(index))
@@ -129,22 +132,27 @@ resolvePattern <- function (spec, opts, generated = logical(length(opts)))
         data.frame(name=optName[index], label=labels, format=formats, required=required, stringsAsFactors=FALSE)
     }
     
-    if (isTRUE(attr(spec, "options"))) {
+    if (isTRUE(attr(spec, "options")))
+    {
         # Every option the command declares, other than any generated for it,
         # preferring the short form of each where there is one
         index <- which(!generated)
         if (length(index) > 0)
             optInfo <- rbind(optInfo, optRow(index, !is.na(optShort[index]), FALSE))
-    } else if (!is.null(attr(spec, "options"))) {
+    }
+    else if (!is.null(attr(spec, "options")))
+    {
         labels <- trimws(unlist(ore_split(",", attr(spec, "options"))))
         labels <- labels[nzchar(labels)]
         
-        for (label in labels) {
+        for (label in labels)
+        {
             longMatch <- ore_search("^([\\w-]+)(!)?$", label)
             index <- if (is.null(longMatch)) NA_integer_ else match(longMatch[,1], optLong)
-            if (!is.na(index)) {
+            if (!is.na(index))
                 optInfo <- rbind(optInfo, optRow(index, FALSE, !is.na(longMatch[,2])))
-            } else {
+            else
+            {
                 # Not a known long-form label, so treat it as a cluster of
                 # short-form ones, each optionally followed by an exclamation
                 if (!(label %~% "^(\\w!?)+$"))
@@ -181,7 +189,8 @@ matchPattern <- function (pattern, parsed, defaults)
     if (ngiven > nexpected && !any(args$multiple))
         return (mismatch(es("too many arguments (#{ngiven} given, #{nexpected} expected at most)")))
     
-    for (i in seq_len(nexpected)) {
+    for (i in seq_len(nexpected))
+    {
         name <- args$name[i]
         if (i <= ngiven) {
             value <- if (args$multiple[i]) parsed$args[i:ngiven] else parsed$args[i]
@@ -192,11 +201,13 @@ matchPattern <- function (pattern, parsed, defaults)
             if (inherits(coerced, "arrgMismatch"))
                 return (coerced)
             result[[name]] <- coerced
-        } else if (!is.null(pattern$defaults[[name]]))
+        }
+        else if (!is.null(pattern$defaults[[name]]))
             result[[name]] <- pattern$defaults[[name]]
     }
     
-    for (i in seq_len(nrow(pattern$options))) {
+    for (i in seq_len(nrow(pattern$options)))
+    {
         name <- pattern$options$name[i]
         if (!is.null(parsed$options[[name]]))
             result[[name]] <- parsed$options[[name]]
