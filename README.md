@@ -6,7 +6,7 @@
 
 [R](https://www.r-project.org) is a scripting language. While often used interactively in exploratory data science, or run batch-style to replicate a previous analysis, the language can also be used for shell-like scripting at a command line. This usage is supported by the `Rscript` binary provided with R, and by [the `littler` project](https://github.com/eddelbuettel/littler), but parsing script arguments requires additional effort.
 
-There are several R packages available to provide option and argument parsing, and choosing between them is largely a matter of taste. [`docopt`](http://docopt.org) is cute, and [available for R](https://cran.r-project.org/package=docopt) thanks to Edwin de Jonge, but I find [some of its heuristics strange](https://mastodon.online/@jonclayden/112213538389204350) and that puts me off. Also available on CRAN are [`argparse`](https://CRAN.R-project.org/package=argparse), [`argparser`](https://CRAN.R-project.org/package=argparser), [`batch`](https://CRAN.R-project.org/package=batch), [`defineOptions`](https://cran.r-project.org/package=defineOptions), [`getopt`](https://cran.r-project.org/package=getopt), [`GetoptLong`](https://cran.r-project.org/package=GetoptLong), [`optigrab`](https://cran.r-project.org/package=optigrab), [`optparse`](https://cran.r-project.org/package=optparse) and [`scribe`](https://cran.r-project.org/package=scribe), so there's no shortage of options.
+There are several R packages available to provide option and argument parsing, and choosing between them is largely a matter of taste. [`docopt`](http://docopt.org) is cute, and [available for R](https://cran.r-project.org/package=docopt) thanks to Edwin de Jonge, but I find [some of its heuristics strange](https://mastodon.online/@jonclayden/112213538389204350) and that puts me off. Also available on CRAN are [`argparse`](https://CRAN.R-project.org/package=argparse), [`argparser`](https://CRAN.R-project.org/package=argparser), [`batch`](https://CRAN.R-project.org/package=batch), [`defineOptions`](https://cran.r-project.org/package=defineOptions), [`getopt`](https://cran.r-project.org/package=getopt), [`GetoptLong`](https://cran.r-project.org/package=GetoptLong), [`optparse`](https://cran.r-project.org/package=optparse) and [`scribe`](https://cran.r-project.org/package=scribe), so there's no shortage of options.
 
 But none of these suited me, [because I'm picky](#why-arrg), so I wrote my own.
 
@@ -20,7 +20,50 @@ The latest release version of the `arrg` package is available [on CRAN](https://
 remotes::install_github("jonclayden/arrg")
 ```
 
-**The package is still in an experimental phase**, so the interface and syntax are likely to change as it is developed. Among features planned but not currently implemented are default patterns, subcommands and automatic help options.
+**The package is still in an experimental phase**, so the interface and syntax may change further as it is developed. Support for subcommands is being considered but is not yet implemented.
+
+## A minimal example
+
+For straightforward cases there is very little to write. Here is a parser for a command called `tally` that counts things in files:
+
+
+``` r
+parser <- arrg::arrg("tally",
+    opt("l,lines", "Count lines instead of characters"),
+    opt("t,total", "Print a combined total as well"))
+```
+
+Notice that the package hasn't been attached with `library()`. The `opt()` and `pat()` functions are made available within the call to `arrg()` itself, so a script needs nothing but `arrg::arrg()`.
+
+That's enough to produce a complete command-line interface. A help option is provided for you, along with a usage pattern for it, and since no patterns were given one is generated that accepts every option and any number of positional arguments:
+
+
+``` r
+parser$show()
+## Usage:
+##   tally -h
+##   tally [-l] [-t] [<args>...]
+## 
+## Options:
+##   -h, --help    Display this usage information and exit
+##   -l, --lines   Count lines instead of characters
+##   -t, --total   Print a combined total as well
+```
+
+
+``` r
+parser$parse(c("-lt", "one.txt", "two.txt"))
+## $args
+## [1] "one.txt" "two.txt"
+## 
+## $lines
+## [1] TRUE
+## 
+## $total
+## [1] TRUE
+```
+
+The positional arguments are gathered under the name `args`, and the options are keyed by their long labels. Everything from here on is a matter of being more specific than this.
 
 ## Creating a parser
 
@@ -32,9 +75,7 @@ Here's an example.
 ``` r
 #! /usr/bin/env Rscript --vanilla
 
-library(arrg)
-
-parser <- arrg("test",
+parser <- arrg::arrg("test",
     opt("h,help", "Display this usage information and exit"),
     opt("n,times", "Run test the specifed number of times", arg="count", default=1L),
     opt("t,time", "Print the overall run-time once the test is completed"),
@@ -57,7 +98,7 @@ The various calls to `opt()` specify options that the command accepts. When the 
 
 Some options take an argument, like the `-n` or `--times` option above. In that case, we specify the name of the argument (`arg="count"`) and, optionally, a default value (`default=1L`). Since the default is of integer mode, any specified value of this argument will be coerced to integer.
 
-Patterns give mutually exclusive ways in which the command may be used, and will be displayed separately in the usage information. Here, we have one pattern that requires the `-h` (or `--help`) option, as the exclamation mark indicates. The second pattern accepts a subcommand and possible arguments (the ellipsis, `...`, indicates one or more values, and the question mark, `?`, that the argument is optional), and accepts the `-n` and `-t` options. The third takes an optional path and accepts the `-n`, `-t` and `--install` options.
+Patterns give mutually exclusive ways in which the command may be used, and will be displayed separately in the usage information. Here, we have one pattern that requires the `-h` (or `--help`) option, as the exclamation mark indicates. That option is declared explicitly above to show how this works, but it need not be: leaving out both the option and its pattern produces exactly the same result, because `arrg` supplies them itself unless the command defines a help option of its own. The second pattern accepts a subcommand and possible arguments (the ellipsis, `...`, indicates one or more values, and the question mark, `?`, that the argument is optional), and accepts the `-n` and `-t` options. The third takes an optional path and accepts the `-n`, `-t` and `--install` options.
 
 This is all made explicit to the user in the usage information, which can be shown using the `show()` method. This is also where the `header` and `footer` arguments above come in, as they're shown before and after the usage and option summary:
 
@@ -75,6 +116,7 @@ parser$show()
 ##   -h, --help                    Display this usage information and
 ##                                 exit
 ##   -n <count>, --times=<count>   Run test the specifed number of times
+##                                 [default 1]
 ##   -t, --time                    Print the overall run-time once the
 ##                                 test is completed
 ##   --install                     Install the code before testing it
@@ -87,7 +129,7 @@ Note that the text blocks are wrapped neatly, each pattern is shown separately, 
 
 ## Parsing arguments
 
-The `parse()` method then does the actual parse. By default it takes script arguments from the result of `commandArgs(trailingOnly=TRUE)`, but arguments can also be specified explicitly. (We would use `argv` for `littler`.)
+The `parse()` method then does the actual parse. By default it takes script arguments from the result of `commandArgs(trailingOnly=TRUE)`, but arguments can also be specified explicitly. (Its argument is called `argv`, which for `littler` is exactly the variable to pass; the `run()` method described below finds the arguments either way.)
 
 
 ``` r
@@ -118,11 +160,70 @@ Here, we're using the third pattern, which `arrg` distinguishes from the second 
 
 The script can now use the parsed argument list to implement its core functionality.
 
+## Running a script
+
+Calling `parse()` yourself leaves a certain amount of boilerplate to write: a script should respond to `--help`, report a usage error on standard error rather than as an R error, exit with a sensible status, and ideally remain usable from the console while you are still writing it. The `run()` method takes care of all of that. You give it the body of the script:
+
+
+``` r
+#! /usr/bin/env Rscript --vanilla
+
+counter <- arrg::arrg("tally",
+    opt("l,lines", "Count lines instead of characters"),
+    opt("t,total", "Print a combined total as well"))
+
+tally <- counter$run({
+    sizes <- vapply(args, function (file) {
+        if (lines) length(readLines(file)) else file.size(file)
+    }, numeric(1))
+    for (i in seq_along(sizes)) cat(sizes[i], args[i], "\n")
+    if (total) cat(sum(sizes), "total\n")
+})
+```
+
+Run from a command line, by `Rscript` or `littler`, this parses the arguments, answers `--help` with the usage summary, reports a usage error on standard error and exits with a non-zero status, and otherwise runs the body. Notice that the parsed arguments are simply available by name—`args`, `lines` and `total` above—with no prefix needed.
+
+When the same file is `source()`d from an interactive session, on the other hand, nothing is run at all. Instead `run()` returns a function whose arguments correspond to the parser's options and positional arguments, and that is what gets assigned to `tally`:
+
+
+``` r
+counter <- arrg::arrg("tally",
+    opt("l,lines", "Count lines instead of characters"),
+    opt("t,total", "Print a combined total as well"))
+
+tally <- counter$run({
+    cat("counting", if (lines) "lines" else "bytes", "in", length(args), "file(s)\n")
+    if (total) cat("... and a combined total\n")
+}, execute=FALSE)
+
+args(tally)
+## function (args = NULL, lines = FALSE, total = FALSE) 
+## NULL
+tally(c("one.txt", "two.txt"), lines=TRUE, total=TRUE)
+## counting lines in 2 file(s)
+## ... and a combined total
+```
+
+So one file serves as both a command and a function, with a single specification and one set of semantics behind both. Since the parser has been told about the options supported by your code, it can construct the function signature appropriately. (`arrg` works out which situation it is in by looking at the call stack, so the `execute` argument above is only needed because this document is not a script.)
+
+The body may also be written as a function rather than a block. Given one that takes an argument, `run()` passes the parsed arguments as a list instead of binding them by name, which is worth preferring for anything substantial, since it can be tested on its own:
+
+
+``` r
+tally <- counter$run(function (opts) {
+    cat("counting", length(opts$args), "file(s)\n")
+})
+```
+
+There is no obligation to use this method, though. If you want more control you can just use `arrg`'s parser and handle all control flow yourself. 
+
 ## Why `arrg`?
 
 OK, so why might you want to use `arrg` in preference to one of the many alternatives for R? As I stated at the outset, this is largely a question of taste, but here are my reasons.
 
 For a fairly basic piece of functionality like this, portability is important to me, and that means that I want dependencies to be minimal, especially outside the R ecosystem. That excludes the `argparse` package, which requires Python, and `GetoptLong`, which requires Perl.
+
+It's quite common that I don't want to choose between script and interactive use for a piece of R code—and even when I do want a pure script, temporary interactivity can help with development and debugging. `arrg` provides that flexibility, uniquely among the alternatives, but does not force you to use it.
 
 Package `batch` doesn't use Unix-style options, but rather an argument list of alternating variable names and values which are interpreted as R expressions. It's an neat and simple solution, but a little verbose to use in my opinion, especially for simple on/off flags. `getopt` is very bare-bones, and is essentially subsumed by `optparse`. I couldn't get `defineOptions` to work as expected using the documentation.
 
@@ -152,45 +253,6 @@ docopt::docopt(paste(help,collapse="\n"), c("-tn3", "--install", "."))
 ##  $ arg      : list()
 ##  $ path     : chr "."
 ## NULL
-```
-
-`optigrab` doesn't use a parser object or up-front interface specification, but just searches for each option on demand. As a result, the requested options must already be in scope when its functions are called. It generates basic usage for options it has seen when `opt_help()` is called.
-
-
-``` r
-library(optigrab)
-## optigrab-0.9.2.1 (2019-01-05) - Copyright © 2019 Decision Patterns
-```
-
-``` r
-
-opts <- c("-t", "-n", "3", "--install", ".")
-
-list(help=opt_get(c("h","help"), FALSE, description="Display this usage information and exit", opts=opts),
-    times=opt_get(c("n","times"), 1L, description="Run test the specifed number of times", opts=opts),
-    time=opt_get(c("t","time"), FALSE, description="Print the overall run-time once the test is completed", opts=opts),
-    install=opt_get("install", FALSE, description="Install the code before testing it", opts=opts),
-    opt_get_verb(opts=opts))
-## $help
-## [1] FALSE
-## 
-## $times
-## [1] 3
-## 
-## $time
-## [1] TRUE
-## 
-## $install
-## [1] TRUE
-## 
-## [[5]]
-## [1] "."
-```
-
-``` r
-
-# This will quit a non-interative R session
-# opt_help(opts="--help")
 ```
 
 The `optparse` package works similarly to `arrg`, although it has quite basic support for positional arguments and creates only a simple usage block by default.
@@ -226,9 +288,6 @@ print_help(op.parser)
 ## 		Install the code before testing it
 ## 
 ## Run the test on the code at the specified path (default "."), or run a specific command.
-```
-
-``` r
 parse_args(op.parser, "-h", print_help_and_exit=FALSE, positional_arguments=TRUE)
 ## $options
 ## $options$help
@@ -240,9 +299,6 @@ parse_args(op.parser, "-h", print_help_and_exit=FALSE, positional_arguments=TRUE
 ## 
 ## $args
 ## character(0)
-```
-
-``` r
 parse_args(op.parser, c("-t", "-n", "3", "--install", "."), print_help_and_exit=FALSE, positional_arguments=TRUE)
 ## $options
 ## $options$times
@@ -292,9 +348,6 @@ s.parser$help()
 ##   -t, --time        : Print the overall run-time once the test is completed
 ##   --install         : Install the code before testing it                   
 ##   command [ARG]     : Command to run or path to code
-```
-
-``` r
 s.parser$parse()
 ## $help
 ## [1] FALSE
