@@ -46,7 +46,7 @@ optDescription <- function (o)
 #' methods \code{parse} or \code{show} contained in the return value should be
 #' called.
 #' 
-#' Options may be given in long form, as in `--times=3` or `--times 3`, or in
+#' Options are handled in long form, as in `--times=3` or `--times 3`, or in
 #' short form, as in `-n3` or `-n 3`. Several short-form options may be
 #' clustered behind a single hyphen, with any option that takes an argument
 #' coming last, as in `-tn3`. Options and positional arguments may be freely
@@ -55,8 +55,29 @@ optDescription <- function (o)
 #' hyphen. A lone `-` is always positional, by convention referring to
 #' standard input.
 #' 
+#' The `run` method provides a script's entry point. Given a function holding
+#' the body of the script, it either calls it or returns a function that will,
+#' according to how the script was invoked. Run from a command line, by
+#' `Rscript` or `littler`, the arguments are parsed, a request for help is
+#' answered with the usage summary, a usage error is reported on standard
+#' error with a non-zero exit status, and otherwise the body is called. When
+#' the script is `source()`d instead, nothing is run: the value is a function
+#' whose formal arguments correspond to the parser's options and positional
+#' arguments, so that the same script can be driven interactively.
+#' 
+#' The body may be a function of one argument, in which case it receives the
+#' parsed arguments as a list, conventionally called `opts`, or none, in which
+#' case they are bound in the environment it runs in and may be referred to by
+#' name. Note that such bindings mask anything of the same name in the
+#' enclosing scope, and that a name the parser could have produced but didn't
+#' is `NULL`. A block of code in braces may also be given in place of a
+#' function, and is equivalent to a function of no arguments. The braces are
+#' required: any other expression is evaluated, and must produce a function,
+#' which allows a body to be built by a factory or taken from a variable.
+#' 
 #' @param name The name of the command.
-#' @param ... Option specifications. See [opt()] for details.
+#' @param ... Option specifications (see [opt()] for details). For the `print`
+#'   method, further arguments to the parser's `show` method, notably `width`.
 #' @param patterns A list of usage patterns that are valid for the command,
 #'   each specifying acceptable options and positional arguments, or a single
 #'   such pattern. See [pat()] for details. If none is given, one is generated
@@ -71,72 +92,45 @@ optDescription <- function (o)
 #'   appended to the usage text produced by the `show` method of the return
 #'   value. Typically used to introduce the command or give brief guidance on
 #'   usage.
-#' @return A list with elements
+#' @param x An argument parser, of class `"arrgParser"`.
+#' @return A list of class `"arrgParser"`, with elements
 #' * `name`: The name of the command, as given above.
-#' * `parse(argv)`: Parse the character vector of arguments passed in, or by
-#'   default, the value of `commandArgs(trailingOnly=TRUE)`.
-#' * `show(con, width)`: Print a usage summary, detailing the valid options and
-#'   patterns. Text will be printed to the specified connection, default
-#'   [stdout()], and wrapped to the width given, which defaults to the value of
-#'   the standard `width` option. Any default value for an option's argument
-#'   is appended to that option's description.
-#' * `run(body, argv, execute, help, exit)`: Run the body of a script, given as
-#'   a function or a block of code in braces, or return a function that will.
-#'   `argv` overrides the arguments to parse, `execute` forces the choice
-#'   between running the body (`TRUE`) and returning a function (`FALSE`),
-#'   `help` names the option that requests usage information, and `exit`
-#'   controls whether the R session is ended after help is given or a usage
-#'   error reported. See Details.
+#' * `parse(argv)`: A method to parse the character vector of arguments passed
+#'   in, or by default, the value of `commandArgs(trailingOnly=TRUE)`.
+#' * `show(con, width)`: A method to print a usage summary, detailing the valid
+#'   options and patterns. Text will be printed to the specified connection,
+#'   default [stdout()], and wrapped to the width given, which defaults to the
+#'   value of the standard `width` option. Any default value for an option's
+#'   argument is appended to that option's description.
+#' * `run(body, argv, execute, help, exit)`: A method designed to wrap the body
+#'   of a script, given as a function or a block of code in braces, or return a
+#'   function that will. `argv` overrides the arguments to parse, `execute`
+#'   forces the choice between running the body (`TRUE`) and returning a
+#'   function (`FALSE`), `help` names the option that requests usage
+#'   information, and `exit` controls whether the R session is ended after help
+#'   is given or a usage error reported. See Details.
 #' 
 #' @note The option and pattern specifications given to this function are
 #'   evaluated with [opt()] and [pat()] in scope, so a script may call
-#'   `arrg::arrg()` without attaching the package using `library()`, and
-#'   without namespacing each of those nested calls.
-#' 
-#' The `run` method provides a script's entry point. Given a function holding
-#' the body of the script, it either calls it or returns a function that will,
-#' according to how the script was invoked. Run from a command line, by
-#' `Rscript` or `littler`, the arguments are parsed, a request for help is
-#' answered with the usage summary, a usage error is reported on standard
-#' error with a non-zero exit status, and otherwise the body is called. When
-#' the script is `source()`d instead, nothing is run: the value is a function
-#' whose formal arguments correspond to the parser's options and positional
-#' arguments, so that the same script can be driven interactively.
-#' 
-#' The body may take one argument, in which case it receives the parsed
-#' arguments as a list, conventionally called `opts`, or none, in which case
-#' they are bound in the environment it runs in and may be referred to by name.
-#' Note that such bindings mask anything of the same name in the enclosing
-#' scope, and that a name the parser could have produced but didn't is bound to
-#' `NULL`. A block of code in braces may also be given in place of a function,
-#' and is equivalent to a function of no arguments. The braces are required:
-#' any other expression is evaluated, and must produce a function, which allows
-#' a body to be built by a factory or taken from a variable.
+#'   `arrg::arrg()` without attaching the package's namespace, and without
+#'   namespacing each of those nested calls.
 #' 
 #' @seealso [opt()], [pat()]
 #' 
 #' @examples
-#'   # A simple parser for a command called "test" with only one option, -h
-#'   p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
-#'   
-#'   # The same, without attaching the package: opt() and pat() are still
-#'   # available within the call itself
-#'   p <- arrg::arrg("test", opt("h","Print help"), patterns=list(pat(.options="h!")))
-#'   
-#'   # The body of a script. When the script is called from a command line
-#'   # run() calls this directly; when it is source()d, run() instead returns
-#'   # a function, as forced here. The mode is detected automatically by default
-#'   greet <- arrg("greet", opt("n,name","Who to greet",default="world"),
-#'                 patterns=list(pat(.options="n")))
-#'   hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
-#'   hello()
-#'   hello(name="reader")
-#'   
-#'   # Print out usage information
-#'   p$show()
-#'   
-#'   # Parse the option
-#'   p$parse("-h")
+#' # A simple parser for a command called "greet" with only one option, -n
+#' greet <- arrg("greet", opt("n,name", "Who to greet", default="world"),
+#'               patterns=list(pat(.options="n")))
+#' 
+#' # The body of a script. When the script is called from a command line
+#' # run() calls this directly; when it is source()d, run() instead returns
+#' # a function, as forced here. The mode is detected automatically by default
+#' hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
+#' 
+#' hello()
+#' hello(name="reader")
+#' 
+#' print(greet)
 #' @author Jon Clayden
 #' @export
 arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, footer = NULL)

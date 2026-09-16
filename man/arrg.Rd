@@ -2,14 +2,18 @@
 % Please edit documentation in R/arrg.R
 \name{arrg}
 \alias{arrg}
+\alias{print.arrgParser}
 \title{Create an argument parser}
 \usage{
 arrg(name, ..., patterns = list(), help = TRUE, header = NULL, footer = NULL)
+
+\method{print}{arrgParser}(x, ...)
 }
 \arguments{
 \item{name}{The name of the command.}
 
-\item{...}{Option specifications. See \code{\link[=opt]{opt()}} for details.}
+\item{...}{Option specifications (see \code{\link[=opt]{opt()}} for details). For the \code{print}
+method, further arguments to the parser's \code{show} method, notably \code{width}.}
 
 \item{patterns}{A list of usage patterns that are valid for the command,
 each specifying acceptable options and positional arguments, or a single
@@ -27,25 +31,27 @@ option of this kind is listed first, and takes no part in a pattern's
 appended to the usage text produced by the \code{show} method of the return
 value. Typically used to introduce the command or give brief guidance on
 usage.}
+
+\item{x}{An argument parser, of class \code{"arrgParser"}.}
 }
 \value{
-A list with elements
+A list of class \code{"arrgParser"}, with elements
 \itemize{
 \item \code{name}: The name of the command, as given above.
-\item \code{parse(argv)}: Parse the character vector of arguments passed in, or by
-default, the value of \code{commandArgs(trailingOnly=TRUE)}.
-\item \code{show(con, width)}: Print a usage summary, detailing the valid options and
-patterns. Text will be printed to the specified connection, default
-\code{\link[=stdout]{stdout()}}, and wrapped to the width given, which defaults to the value of
-the standard \code{width} option. Any default value for an option's argument
-is appended to that option's description.
-\item \code{run(body, argv, execute, help, exit)}: Run the body of a script, given as
-a function or a block of code in braces, or return a function that will.
-\code{argv} overrides the arguments to parse, \code{execute} forces the choice
-between running the body (\code{TRUE}) and returning a function (\code{FALSE}),
-\code{help} names the option that requests usage information, and \code{exit}
-controls whether the R session is ended after help is given or a usage
-error reported. See Details.
+\item \code{parse(argv)}: A method to parse the character vector of arguments passed
+in, or by default, the value of \code{commandArgs(trailingOnly=TRUE)}.
+\item \code{show(con, width)}: A method to print a usage summary, detailing the valid
+options and patterns. Text will be printed to the specified connection,
+default \code{\link[=stdout]{stdout()}}, and wrapped to the width given, which defaults to the
+value of the standard \code{width} option. Any default value for an option's
+argument is appended to that option's description.
+\item \code{run(body, argv, execute, help, exit)}: A method designed to wrap the body
+of a script, given as a function or a block of code in braces, or return a
+function that will. \code{argv} overrides the arguments to parse, \code{execute}
+forces the choice between running the body (\code{TRUE}) and returning a
+function (\code{FALSE}), \code{help} names the option that requests usage
+information, and \code{exit} controls whether the R session is ended after help
+is given or a usage error reported. See Details.
 }
 }
 \description{
@@ -55,7 +61,7 @@ methods \code{parse} or \code{show} contained in the return value should be
 called.
 }
 \details{
-Options may be given in long form, as in \code{--times=3} or \verb{--times 3}, or in
+Options are handled in long form, as in \code{--times=3} or \verb{--times 3}, or in
 short form, as in \code{-n3} or \verb{-n 3}. Several short-form options may be
 clustered behind a single hyphen, with any option that takes an argument
 coming last, as in \code{-tn3}. Options and positional arguments may be freely
@@ -63,12 +69,6 @@ interleaved. A \verb{--} argument stops option parsing and is discarded:
 everything after it is treated as positional, even if it begins with a
 hyphen. A lone \code{-} is always positional, by convention referring to
 standard input.
-}
-\note{
-The option and pattern specifications given to this function are
-evaluated with \code{\link[=opt]{opt()}} and \code{\link[=pat]{pat()}} in scope, so a script may call
-\code{arrg::arrg()} without attaching the package using \code{library()}, and
-without namespacing each of those nested calls.
 
 The \code{run} method provides a script's entry point. Given a function holding
 the body of the script, it either calls it or returns a function that will,
@@ -80,38 +80,36 @@ the script is \code{source()}d instead, nothing is run: the value is a function
 whose formal arguments correspond to the parser's options and positional
 arguments, so that the same script can be driven interactively.
 
-The body may take one argument, in which case it receives the parsed
-arguments as a list, conventionally called \code{opts}, or none, in which case
-they are bound in the environment it runs in and may be referred to by name.
-Note that such bindings mask anything of the same name in the enclosing
-scope, and that a name the parser could have produced but didn't is bound to
-\code{NULL}. A block of code in braces may also be given in place of a function,
-and is equivalent to a function of no arguments. The braces are required:
-any other expression is evaluated, and must produce a function, which allows
-a body to be built by a factory or taken from a variable.
+The body may be a function of one argument, in which case it receives the
+parsed arguments as a list, conventionally called \code{opts}, or none, in which
+case they are bound in the environment it runs in and may be referred to by
+name. Note that such bindings mask anything of the same name in the
+enclosing scope, and that a name the parser could have produced but didn't
+is \code{NULL}. A block of code in braces may also be given in place of a
+function, and is equivalent to a function of no arguments. The braces are
+required: any other expression is evaluated, and must produce a function,
+which allows a body to be built by a factory or taken from a variable.
+}
+\note{
+The option and pattern specifications given to this function are
+evaluated with \code{\link[=opt]{opt()}} and \code{\link[=pat]{pat()}} in scope, so a script may call
+\code{arrg::arrg()} without attaching the package's namespace, and without
+namespacing each of those nested calls.
 }
 \examples{
-  # A simple parser for a command called "test" with only one option, -h
-  p <- arrg("test", opt("h", "Print help"), patterns=list(pat(.options="h!")))
-  
-  # The same, without attaching the package: opt() and pat() are still
-  # available within the call itself
-  p <- arrg::arrg("test", opt("h","Print help"), patterns=list(pat(.options="h!")))
-  
-  # The body of a script. When the script is called from a command line
-  # run() calls this directly; when it is source()d, run() instead returns
-  # a function, as forced here. The mode is detected automatically by default
-  greet <- arrg("greet", opt("n,name","Who to greet",default="world"),
-                patterns=list(pat(.options="n")))
-  hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
-  hello()
-  hello(name="reader")
-  
-  # Print out usage information
-  p$show()
-  
-  # Parse the option
-  p$parse("-h")
+# A simple parser for a command called "greet" with only one option, -n
+greet <- arrg("greet", opt("n,name", "Who to greet", default="world"),
+              patterns=list(pat(.options="n")))
+
+# The body of a script. When the script is called from a command line
+# run() calls this directly; when it is source()d, run() instead returns
+# a function, as forced here. The mode is detected automatically by default
+hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
+
+hello()
+hello(name="reader")
+
+print(greet)
 }
 \seealso{
 \code{\link[=opt]{opt()}}, \code{\link[=pat]{pat()}}

@@ -28,8 +28,9 @@ period distinguishes this parameter from the positional arguments passed
 in \code{...}, whose names can never contain one.}
 }
 \value{
-A list capturing the positional arguments, with options in an
-attribute. This will not usually be used directly, but passed to \code{\link[=arrg]{arrg()}}.
+A list of class \code{"arrgPatternSpec"}, capturing the positional
+arguments, with options in an attribute. This will not usually be used
+directly, but passed to \code{\link[=arrg]{arrg()}}.
 }
 \description{
 This function is used to specify a valid usage pattern for the command,
@@ -43,17 +44,17 @@ match if all required options and positional arguments have been specified,
 and no unexpected options are included.
 }
 \examples{
-  # A pattern with no positional arguments, but requiring the -h flag
-  pat(.options="h!")
-  
-  # A pattern that takes a command and variable number of arguments, and
-  # accepts the -n and -t options (note the latter are specified in cluster
-  # form, but "n,t" is also valid) 
-  pat("command", "arg...?", .options="nt")
-  
-  # A pattern with one optional argument, which defaults to "." if it is
-  # not given, and which accepts every option the command declares
-  pat(path=".", .options=TRUE)
+# A pattern with no positional arguments, but requiring the -h flag
+pat(.options="h!")
+
+# A pattern that takes a command and variable number of arguments, and
+# accepts the -n and -t options (note the latter are specified in cluster
+# form, but "n,t" is also valid) 
+pat("command", "arg...?", .options="nt")
+
+# A pattern with one optional argument, which defaults to "." if it is
+# not given, and which accepts every option the command declares
+pat(path=".", .options=TRUE)
 
 }
 \seealso{

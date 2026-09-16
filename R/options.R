@@ -31,11 +31,11 @@ optField <- function (opts, field, type = character(1))
 #' @seealso [arrg()]
 #' 
 #' @examples
-#'   # A simple flag-style option with no argument
-#'   opt("h,help", "Display this usage information and exit")
-#'   
-#'   # An option that takes an integer argument called "count"
-#'   opt("n,times", "Run this many times", arg="count", default=1L)
+#' # A simple flag-style option with no argument
+#' opt("h,help", "Display this usage information and exit")
+#' 
+#' # An option that takes an integer argument called "count"
+#' opt("n,times", "Run this many times", arg="count", default=1L)
 #' 
 #' @author Jon Clayden
 #' @export

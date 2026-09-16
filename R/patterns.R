@@ -27,22 +27,23 @@
 #'   [arrg()] generated itself, such as an automatic help option. The leading
 #'   period distinguishes this parameter from the positional arguments passed
 #'   in `...`, whose names can never contain one.
-#' @return A list capturing the positional arguments, with options in an
-#'   attribute. This will not usually be used directly, but passed to [arrg()].
+#' @return A list of class `"arrgPatternSpec"`, capturing the positional
+#'   arguments, with options in an attribute. This will not usually be used
+#'   directly, but passed to [arrg()].
 #' @seealso [arrg()]
 #' 
 #' @examples
-#'   # A pattern with no positional arguments, but requiring the -h flag
-#'   pat(.options="h!")
-#'   
-#'   # A pattern that takes a command and variable number of arguments, and
-#'   # accepts the -n and -t options (note the latter are specified in cluster
-#'   # form, but "n,t" is also valid) 
-#'   pat("command", "arg...?", .options="nt")
-#'   
-#'   # A pattern with one optional argument, which defaults to "." if it is
-#'   # not given, and which accepts every option the command declares
-#'   pat(path=".", .options=TRUE)
+#' # A pattern with no positional arguments, but requiring the -h flag
+#' pat(.options="h!")
+#' 
+#' # A pattern that takes a command and variable number of arguments, and
+#' # accepts the -n and -t options (note the latter are specified in cluster
+#' # form, but "n,t" is also valid) 
+#' pat("command", "arg...?", .options="nt")
+#' 
+#' # A pattern with one optional argument, which defaults to "." if it is
+#' # not given, and which accepts every option the command declares
+#' pat(path=".", .options=TRUE)
 #' 
 #' @author Jon Clayden
 #' @export
