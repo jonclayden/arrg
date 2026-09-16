@@ -27,6 +27,18 @@ coerceValue <- function (value, mode, what)
     return (result)
 }
 
+# The description shown for an option, with its default argument value
+# appended where there is one to show. A flag takes no argument, and an option
+# whose argument was given no default holds NA, so neither of those qualifies
+optDescription <- function (o)
+{
+    if (!o$arg || all(is.na(o$default)))
+        return (o$description)
+    
+    value <- if (is.character(o$default)) encodeString(o$default, quote="\"") else as.character(o$default)
+    return (paste0(o$description, " [default ", paste(value, collapse=", "), "]"))
+}
+
 #' Create an argument parser
 #' 
 #' This function creates an argument parser that handles the specified options
@@ -65,7 +77,8 @@ coerceValue <- function (value, mode, what)
 #' * `show(con, width)`: Print a usage summary, detailing the valid options and
 #'   patterns. Text will be printed to the specified connection, default
 #'   [stdout()], and wrapped to the width given, which defaults to the value of
-#'   the standard `width` option.
+#'   the standard `width` option. Any default value for an option's argument
+#'   is appended to that option's description.
 #' * `run(body, args, mode, help, exit)`: Run the body of a script, given as a
 #'   function or a block of code in braces, or return a function that will. `args` overrides the arguments to parse, `mode` the
 #'   choice between running (`"script"`) and returning a function
@@ -335,7 +348,7 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
             lines <- c(lines, "Options:")
             for (i in seq_along(.opts)) {
                 label <- optLines[[i]]
-                descLines <- strwrap(.opts[[i]]$description, max(if (stack) width-6L else descWidth, minDescWidth))
+                descLines <- strwrap(optDescription(.opts[[i]]), max(if (stack) width-6L else descWidth, minDescWidth))
                 if (stack)
                     lines <- c(lines, paste0("  ", label), paste0("      ", descLines))
                 else {

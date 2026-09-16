@@ -431,3 +431,27 @@ expect_false(any(grepl("Display this usage",
                                            help="Show help and exit.")$show()))))
 expect_error(arrg("test", opt("v","V"), help=1L), "must be TRUE, FALSE, or a single string")
 expect_error(arrg("test", opt("v","V"), help=c("a","b")), "single string")
+
+# An option's default argument value is appended to its description, with
+# strings quoted, but not for a flag or an argument that has no default
+hasText <- function (parser, text)
+    any(grepl(text, capture.output(parser$show(width=200)), fixed=TRUE))
+
+expect_true(hasText(arrg("t", opt("n,times","Count",arg="count",default=1L)), "Count [default 1]"))
+expect_true(hasText(arrg("t", opt("o,out","Output",arg="file",default="stdout")), 'Output [default "stdout"]'))
+expect_true(hasText(arrg("t", opt("s,scale","Scale",arg="factor",default=2.5)), "Scale [default 2.5]"))
+expect_true(hasText(arrg("t", opt("r,range","Range",arg="bounds",default=c(0L,100L))), "Range [default 0, 100]"))
+expect_true(hasText(arrg("t", opt("f,force","Force",default=TRUE)), "Force [default TRUE]"))
+expect_false(hasText(arrg("t", opt("v,verbose","Verbose")), "[default"))
+expect_false(hasText(arrg("t", opt("i,input","Input",arg="file")), "[default"))
+expect_false(hasText(arrg("t", opt("v","V")), "[default"))   # nor the generated help flag
+
+# A quote within a default value is escaped
+expect_true(hasText(arrg("t", opt("q,quote","Quote",arg="char",default="\"")), '[default "\\""]'))
+
+# It forms part of the description text, so it wraps along with it and still
+# respects the width
+narrowDefault <- capture.output(arrg("t", opt("n,times","Run the test the specified number of times",
+                                              arg="count", default=1L), help=FALSE)$show(width=50))
+expect_true(any(grepl("[default 1]", narrowDefault, fixed=TRUE)))
+expect_true(all(nchar(narrowDefault, "width") <= 50))

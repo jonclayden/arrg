@@ -36,7 +36,8 @@ default, the value of \code{commandArgs(trailingOnly=TRUE)}.
 \item \code{show(con, width)}: Print a usage summary, detailing the valid options and
 patterns. Text will be printed to the specified connection, default
 \code{\link[=stdout]{stdout()}}, and wrapped to the width given, which defaults to the value of
-the standard \code{width} option.
+the standard \code{width} option. Any default value for an option's argument
+is appended to that option's description.
 \item \code{run(body, args, mode, help, exit)}: Run the body of a script, given as a
 function or a block of code in braces, or return a function that will. \code{args} overrides the arguments to parse, \code{mode} the
 choice between running (\code{"script"}) and returning a function
