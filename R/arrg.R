@@ -146,6 +146,18 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
     # the caller's environment, as it would be normally
     scope <- list(opt=opt, pat=pat)
     caller <- parent.frame()
+    
+    # The name is evaluated in the same scope as the rest of the specification,
+    # so that an omitted name, which leaves an option in its place, can be
+    # recognised and reported as such
+    if (missing(name))
+        stop("The name of the command must be given as the first argument to arrg()")
+    name <- eval(substitute(name), envir=scope, enclos=caller)
+    if (inherits(name, "arrgOption") || inherits(name, "arrgPatternSpec"))
+        stop("The first argument to arrg() should be the name of the command, which appears to have been omitted")
+    if (!is.character(name) || length(name) != 1L || is.na(name) || !nzchar(name))
+        stop("The name of the command must be a single non-empty string")
+    
     .opts <- lapply(as.list(substitute(list(...)))[-1], eval, envir=scope, enclos=caller)
     patterns <- eval(substitute(patterns), envir=scope, enclos=caller)
     
