@@ -32,19 +32,20 @@ usage.}
 A list with elements
 \itemize{
 \item \code{name}: The name of the command, as given above.
-\item \code{parse(args)}: Parse the character vector of arguments passed in, or by
+\item \code{parse(argv)}: Parse the character vector of arguments passed in, or by
 default, the value of \code{commandArgs(trailingOnly=TRUE)}.
 \item \code{show(con, width)}: Print a usage summary, detailing the valid options and
 patterns. Text will be printed to the specified connection, default
 \code{\link[=stdout]{stdout()}}, and wrapped to the width given, which defaults to the value of
 the standard \code{width} option. Any default value for an option's argument
 is appended to that option's description.
-\item \code{run(body, args, mode, help, exit)}: Run the body of a script, given as a
-function or a block of code in braces, or return a function that will. \code{args} overrides the arguments to parse, \code{mode} the
-choice between running (\code{"script"}) and returning a function
-(\code{"function"}), \code{help} names the option that requests usage information,
-and \code{exit} controls whether the R session is ended after help is given or
-a usage error reported. See Details.
+\item \code{run(body, argv, execute, help, exit)}: Run the body of a script, given as
+a function or a block of code in braces, or return a function that will.
+\code{argv} overrides the arguments to parse, \code{execute} forces the choice
+between running the body (\code{TRUE}) and returning a function (\code{FALSE}),
+\code{help} names the option that requests usage information, and \code{exit}
+controls whether the R session is ended after help is given or a usage
+error reported. See Details.
 }
 }
 \description{
@@ -80,14 +81,14 @@ whose formal arguments correspond to the parser's options and positional
 arguments, so that the same script can be driven interactively.
 
 The body may take one argument, in which case it receives the parsed
-arguments as a list, or none, in which case they are bound in the
-environment it runs in and may be referred to by name. Note that such
-bindings mask anything of the same name in the enclosing scope, and that a
-name the parser could have produced but didn't is bound to \code{NULL}. A block
-of code in braces may also be given in place of a function, and is
-equivalent to a function of no arguments. The braces are required: any
-other expression is evaluated, and must produce a function, which allows a
-body to be built by a factory or taken from a variable.
+arguments as a list, conventionally called \code{opts}, or none, in which case
+they are bound in the environment it runs in and may be referred to by name.
+Note that such bindings mask anything of the same name in the enclosing
+scope, and that a name the parser could have produced but didn't is bound to
+\code{NULL}. A block of code in braces may also be given in place of a function,
+and is equivalent to a function of no arguments. The braces are required:
+any other expression is evaluated, and must produce a function, which allows
+a body to be built by a factory or taken from a variable.
 }
 \examples{
   # A simple parser for a command called "test" with only one option, -h
@@ -102,7 +103,7 @@ body to be built by a factory or taken from a variable.
   # a function, as forced here. The mode is detected automatically by default
   greet <- arrg("greet", opt("n,name","Who to greet",default="world"),
                 patterns=list(pat(.options="n")))
-  hello <- greet$run(function () cat("Hello,", name, "\n"), mode="function")
+  hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
   hello()
   hello(name="reader")
   

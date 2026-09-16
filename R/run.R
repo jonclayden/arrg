@@ -30,11 +30,11 @@ scriptArgs <- function ()
 
 # Whether the arguments include a request for help. Anything after a "--"
 # terminator is a positional argument, and so is not considered
-helpRequested <- function (args, o)
+helpRequested <- function (argv, o)
 {
-    terminator <- match("--", args, nomatch=length(args)+1L)
+    terminator <- match("--", argv, nomatch=length(argv)+1L)
     labels <- c(if (!is.na(o$short)) paste0("-",o$short), if (!is.na(o$long)) paste0("--",o$long))
-    return (any(args[seq_len(terminator-1L)] %in% labels))
+    return (any(argv[seq_len(terminator-1L)] %in% labels))
 }
 
 # Call the body of a script, passing it the parsed arguments as a list, or if

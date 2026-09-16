@@ -108,8 +108,8 @@ resolvePattern <- function (spec, opts, generated = logical(length(opts)))
         argDefaults <- spec[defaulted]
         names(argDefaults) <- argInfo$name[defaulted]
         
-        nargs <- nrow(argInfo)
-        if (any(argInfo$multiple[-nargs]))
+        npositional <- nrow(argInfo)
+        if (any(argInfo$multiple[-npositional]))
             stop("Only the last positional argument can take multiple values")
         firstOptional <- match(FALSE, argInfo$required)
         if (!is.na(firstOptional) && any(argInfo$required[-seq_len(firstOptional)]))
@@ -172,16 +172,16 @@ matchPattern <- function (pattern, parsed, defaults)
         return (mismatch(es("option #{parsed$labels[[unexpected[1]]]} is not valid here")))
     
     args <- pattern$args
-    nargs <- nrow(args)
+    nexpected <- nrow(args)
     ngiven <- length(parsed$args)
     nrequired <- sum(args$required)
     
     if (ngiven < nrequired)
         return (mismatch(es("argument <#{args$format[ngiven+1]}> is required")))
-    if (ngiven > nargs && !any(args$multiple))
-        return (mismatch(es("too many arguments (#{ngiven} given, #{nargs} expected at most)")))
+    if (ngiven > nexpected && !any(args$multiple))
+        return (mismatch(es("too many arguments (#{ngiven} given, #{nexpected} expected at most)")))
     
-    for (i in seq_len(nargs)) {
+    for (i in seq_len(nexpected)) {
         name <- args$name[i]
         if (i <= ngiven) {
             value <- if (args$multiple[i]) parsed$args[i:ngiven] else parsed$args[i]

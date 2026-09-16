@@ -1,4 +1,4 @@
-args <- arrg("test",
+parser <- arrg("test",
              opt("h,help", "Display this usage information and exit"),
              opt("n,times", "Run test the specifed number of times", arg="count", default=1L),
              opt("t,time", "Print the overall run-time once the test is completed"),
@@ -9,11 +9,11 @@ args <- arrg("test",
              header="Test your code",
              footer="Run the test on the code at the specified path (default \".\"), or run a specific command.")
 
-expect_stdout(args$show(), "usage")
+expect_stdout(parser$show(), "usage")
 
-p1 <- args$parse("-h")
-p2 <- args$parse(c("-tn3", "--install", "."))       # NB: --install flag is the only thing that marks this as the third pattern not the second
-p3 <- args$parse(c("-t", "mycommand", "one", "two"))
+p1 <- parser$parse("-h")
+p2 <- parser$parse(c("-tn3", "--install", "."))       # NB: --install flag is the only thing that marks this as the third pattern not the second
+p3 <- parser$parse(c("-t", "mycommand", "one", "two"))
 
 expect_true(p1$help)
 expect_null(p2$help)
@@ -33,13 +33,13 @@ expect_error(arrg("test", patterns=list(pat("command!"))), "Format")
 expect_error(arrg("test", patterns=list(pat("source...", "target..."))), "multiple values")
 
 # Usage errors: non-existent options, missing arguments, ambiguity
-expect_error(args$parse("-i"), "Unexpected")
-expect_error(args$parse("--error"), "Unexpected")
-expect_error(args$parse("-n"), "argument")
-expect_error(args$parse("--times"), "argument")
-expect_error(args$parse("--time=yes"), "argument")
-expect_warning(args$parse(c("-n", "-3")), "parameter")
-expect_error(args$parse(c("-h", "-t")), "pattern")
+expect_error(parser$parse("-i"), "Unexpected")
+expect_error(parser$parse("--error"), "Unexpected")
+expect_error(parser$parse("-n"), "argument")
+expect_error(parser$parse("--times"), "argument")
+expect_error(parser$parse("--time=yes"), "argument")
+expect_warning(parser$parse(c("-n", "-3")), "parameter")
+expect_error(parser$parse(c("-h", "-t")), "pattern")
 
 # Option labels: leading hyphens and surrounding whitespace are stripped
 expect_equal(opt("-h,--help","x")$long, "help")
@@ -93,24 +93,24 @@ wrapped <- arrg("cmd", opt("n,times","d",arg="count"), opt("v","verbose"),
 expect_stdout(wrapped$show(width=40), "Usage")
 
 # The "--" terminator ends option parsing, and protects what follows
-expect_equal(args$parse(c("--","-tn3"))$command, "-tn3")
-expect_false(args$parse(c("--","-tn3"))$time)
-expect_equal(args$parse(c("-t","--","-n5"))$command, "-n5")
+expect_equal(parser$parse(c("--","-tn3"))$command, "-tn3")
+expect_false(parser$parse(c("--","-tn3"))$time)
+expect_equal(parser$parse(c("-t","--","-n5"))$command, "-n5")
 
 # Options and positional arguments may be interleaved
-expect_equal(args$parse(c("mycommand","-tn3"))$command, "mycommand")
-expect_true(args$parse(c("mycommand","-tn3"))$time)
-expect_equal(args$parse(c("mycommand","-tn3"))$times, 3L)
-expect_equal(args$parse(c("-t","one","-n","3","two"))$command, "one")
-expect_equal(args$parse(c("-t","one","-n","3","two"))$arg, "two")
+expect_equal(parser$parse(c("mycommand","-tn3"))$command, "mycommand")
+expect_true(parser$parse(c("mycommand","-tn3"))$time)
+expect_equal(parser$parse(c("mycommand","-tn3"))$times, 3L)
+expect_equal(parser$parse(c("-t","one","-n","3","two"))$command, "one")
+expect_equal(parser$parse(c("-t","one","-n","3","two"))$arg, "two")
 
 # Short-option clusters, with a value attached or detached
-expect_equal(args$parse(c("-tn3","."))$times, 3L)
-expect_true(args$parse(c("-tn3","."))$time)
-expect_equal(args$parse(c("-n3","."))$times, 3L)
-expect_equal(args$parse(c("-n","3","."))$times, 3L)
-expect_error(args$parse("-tx"), "-x")      # names the offending letter
-expect_error(args$parse("-xyz"), "-xyz")   # not a cluster at all, so named whole
+expect_equal(parser$parse(c("-tn3","."))$times, 3L)
+expect_true(parser$parse(c("-tn3","."))$time)
+expect_equal(parser$parse(c("-n3","."))$times, 3L)
+expect_equal(parser$parse(c("-n","3","."))$times, 3L)
+expect_error(parser$parse("-tx"), "-x")      # names the offending letter
+expect_error(parser$parse("-xyz"), "-xyz")   # not a cluster at all, so named whole
 
 # Long-form labels may be internally hyphenated
 hyphenated <- arrg("test", opt("n,dry-run","Do nothing"), opt("o,out","Output",arg="file"),
@@ -122,7 +122,7 @@ expect_stdout(hyphenated$show(), "--dry-run")
 expect_error(opt("dry-","x"), "hyphenated")
 
 # A lone "-" is a positional argument, conventionally standard input
-expect_equal(args$parse("-")$command, "-")
+expect_equal(parser$parse("-")$command, "-")
 expect_equal(hyphenated$parse(c("-o","-"))$out, "-")
 
 # A value attached with "=" may be empty
@@ -155,8 +155,8 @@ expect_error(typed$parse("--flag=maybe"), "logical")
 expect_equal(typed$parse("--flag=TRUE")$flag, TRUE)
 
 # Failure to match reports why each pattern in turn was rejected
-expect_error(args$parse(c("-h","-t")), "do not match any usage pattern")
-expect_error(args$parse(c("-h","-t")), "--install")     # each pattern is listed
+expect_error(parser$parse(c("-h","-t")), "do not match any usage pattern")
+expect_error(parser$parse(c("-h","-t")), "--install")     # each pattern is listed
 expect_error(optional$parse("-v"), "is required")       # with its own reason
 
 # A positional argument given as a named element takes the name as its
@@ -215,7 +215,7 @@ usageLines <- function (parser, width) {
 
 # No line exceeds the requested width, at any width where the labels do fit
 for (w in c(40, 50, 60, 70, 80, 100))
-    expect_true(all(nchar(usageLines(args, w), "width") <= w))
+    expect_true(all(nchar(usageLines(parser, w), "width") <= w))
 
 # A label taking up more than 60% of the width is split across two lines
 wide <- arrg("build",
@@ -268,14 +268,14 @@ ran <- NULL
 runner <- arrg("test", opt("v,verbose","Be verbose"),
                opt("n,times","Count",arg="count",default=1L),
                patterns=list(pat(path=".", .options="v,n")))
-runner$run(function (args) ran <<- args, args=c("-v","-n3","/tmp"), mode="script", exit=FALSE)
+runner$run(function (opts) ran <<- opts, argv=c("-v","-n3","/tmp"), execute=TRUE, exit=FALSE)
 expect_equal(ran$path, "/tmp")
 expect_equal(ran$times, 3L)
 expect_true(ran$verbose)
 
 # ... or take none, in which case they are bound in the body's environment
 runner$run(function () ran <<- list(path=path, times=times, verbose=verbose),
-           args="/var", mode="script", exit=FALSE)
+           argv="/var", execute=TRUE, exit=FALSE)
 expect_equal(ran$path, "/var")
 expect_equal(ran$times, 1L)
 expect_false(ran$verbose)
@@ -285,20 +285,20 @@ expect_false(ran$verbose)
 absent <- arrg("test", patterns=list(pat("src","dest?")))
 outerValue <- "visible"
 absent$run(function () ran <<- list(dest=is.null(dest), outer=outerValue),
-           args="a", mode="script", exit=FALSE)
+           argv="a", execute=TRUE, exit=FALSE)
 expect_true(ran$dest)
 expect_equal(ran$outer, "visible")
 
 # littler makes a script's arguments available in a top-level "argv" variable
 assign("argv", c("-v","/usr"), envir=globalenv())
-runner$run(function () ran <<- list(path=path, verbose=verbose), mode="script", exit=FALSE)
+runner$run(function () ran <<- list(path=path, verbose=verbose), execute=TRUE, exit=FALSE)
 rm("argv", envir=globalenv())
 expect_equal(ran$path, "/usr")
 expect_true(ran$verbose)
 
 # In function mode the body is not run; a function is returned whose formals
 # correspond to the positional arguments and options, with their defaults
-wrapper <- runner$run(function (args) args, mode="function")
+wrapper <- runner$run(function (opts) opts, execute=FALSE)
 expect_true(is.function(wrapper))
 expect_equal(names(formals(wrapper)), c("path","verbose","times"))
 expect_equal(formals(wrapper)$times, 1L)
@@ -313,16 +313,16 @@ expect_error(wrapper(nope=1), "unused argument")
 # they do not rule out patterns that don't accept them
 twoWay <- arrg("test", opt("h,help","Help"), opt("v","Verbose"),
                patterns=list(pat(.options="v"), pat(.options="h!")))
-expect_false(twoWay$run(function (args) args, mode="function")()$v)
+expect_false(twoWay$run(function (opts) opts, execute=FALSE)()$v)
 
 # A request for help is answered before the patterns are matched, so it works
 # even alongside arguments that are otherwise invalid
-expect_stdout(twoWay$run(function () NULL, args="--help", mode="script", exit=FALSE), "Usage")
-expect_stdout(twoWay$run(function () NULL, args=c("--help","--bogus"), mode="script", exit=FALSE), "Usage")
+expect_stdout(twoWay$run(function () NULL, argv="--help", execute=TRUE, exit=FALSE), "Usage")
+expect_stdout(twoWay$run(function () NULL, argv=c("--help","--bogus"), execute=TRUE, exit=FALSE), "Usage")
 
 # Usage errors are reported on standard error, with a hint
-msgs <- capture.output(tryCatch(twoWay$run(function () NULL, args="--bogus",
-                                           mode="script", exit=FALSE),
+msgs <- capture.output(tryCatch(twoWay$run(function () NULL, argv="--bogus",
+                                           execute=TRUE, exit=FALSE),
                                 error=function (cond) NULL), type="message")
 expect_true(any(grepl("^test: Unexpected long-style option", msgs)))
 expect_true(any(grepl("Try 'test --help' for more information", msgs)))
@@ -331,35 +331,35 @@ expect_error(runner$run("not a function"), "must be a function")
 
 # A block of code in braces may be given in place of a function, and behaves
 # as a function of no arguments would
-expect_equal(runner$run({ path }, args="/tmp", mode="script", exit=FALSE), "/tmp")
-expect_equal(runner$run({ times }, args=c("-n","4","/tmp"), mode="script", exit=FALSE), 4L)
+expect_equal(runner$run({ path }, argv="/tmp", execute=TRUE, exit=FALSE), "/tmp")
+expect_equal(runner$run({ times }, argv=c("-n","4","/tmp"), execute=TRUE, exit=FALSE), 4L)
 
 # The block must not be run in the course of working out what it is, so an
 # invalid set of arguments leaves it untouched
 executed <- FALSE
-invisible(capture.output(tryCatch(runner$run({ executed <<- TRUE }, args="--bogus",
-                                             mode="script", exit=FALSE),
+invisible(capture.output(tryCatch(runner$run({ executed <<- TRUE }, argv="--bogus",
+                                             execute=TRUE, exit=FALSE),
                                   error=function (cond) NULL), type="message"))
 expect_false(executed)
 
 # A block gets an evaluation frame of its own, so return() and on.exit() work
 cleaned <- FALSE
 expect_equal(runner$run({ on.exit(cleaned <<- TRUE); return(path) },
-                        args="/var", mode="script", exit=FALSE), "/var")
+                        argv="/var", execute=TRUE, exit=FALSE), "/var")
 expect_true(cleaned)
 
 # In function mode a block yields a wrapper, just as a function does
-blockWrapper <- runner$run({ path }, mode="function")
+blockWrapper <- runner$run({ path }, execute=FALSE)
 expect_equal(names(formals(blockWrapper)), c("path","verbose","times"))
 expect_equal(blockWrapper("/usr"), "/usr")
 expect_equal(blockWrapper(), ".")
 
 # Anything that is not a literal block is evaluated and must yield a function,
 # so a function referred to by name or extracted from a list still works
-namedBody <- function (args) args$path
-expect_equal(runner$run(namedBody, args="/tmp", mode="script", exit=FALSE), "/tmp")
-bodyList <- list(function (args) args$path)
-expect_equal(runner$run(bodyList[[1]], args="/var", mode="script", exit=FALSE), "/var")
+namedBody <- function (opts) opts$path
+expect_equal(runner$run(namedBody, argv="/tmp", execute=TRUE, exit=FALSE), "/tmp")
+bodyList <- list(function (opts) opts$path)
+expect_equal(runner$run(bodyList[[1]], argv="/var", execute=TRUE, exit=FALSE), "/var")
 expect_error(runner$run("not a function"), "must be a function")
 expect_error(runner$run(42), "must be a function")
 
@@ -405,7 +405,7 @@ expect_equal(arrg("one", opt("v","V"), patterns=pat("file", .options=TRUE))$pars
 expect_error(arrg("one", patterns="notapattern"), "pat\\(\\) function")
 
 # A generated help option takes no part in the function returned by run()
-expect_equal(names(formals(generated$run({ NULL }, mode="function"))),
+expect_equal(names(formals(generated$run({ NULL }, execute=FALSE))),
              c("args","verbose","times"))
 
 # A cluster in .options formats each of its options, not just the first
@@ -458,3 +458,7 @@ expect_true(all(nchar(narrowDefault, "width") <= 50))
 
 # The parser exposes the name of the command it was created for
 expect_equal(arrg("mycommand", opt("v","V"))$name, "mycommand")
+
+# run()'s execute argument must be a single logical value
+expect_error(runner$run({ NULL }, execute="function"), "must be TRUE, FALSE or NA")
+expect_error(runner$run({ NULL }, execute=c(TRUE,FALSE)), "must be TRUE, FALSE or NA")

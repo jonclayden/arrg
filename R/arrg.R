@@ -73,19 +73,20 @@ optDescription <- function (o)
 #'   usage.
 #' @return A list with elements
 #' * `name`: The name of the command, as given above.
-#' * `parse(args)`: Parse the character vector of arguments passed in, or by
+#' * `parse(argv)`: Parse the character vector of arguments passed in, or by
 #'   default, the value of `commandArgs(trailingOnly=TRUE)`.
 #' * `show(con, width)`: Print a usage summary, detailing the valid options and
 #'   patterns. Text will be printed to the specified connection, default
 #'   [stdout()], and wrapped to the width given, which defaults to the value of
 #'   the standard `width` option. Any default value for an option's argument
 #'   is appended to that option's description.
-#' * `run(body, args, mode, help, exit)`: Run the body of a script, given as a
-#'   function or a block of code in braces, or return a function that will. `args` overrides the arguments to parse, `mode` the
-#'   choice between running (`"script"`) and returning a function
-#'   (`"function"`), `help` names the option that requests usage information,
-#'   and `exit` controls whether the R session is ended after help is given or
-#'   a usage error reported. See Details.
+#' * `run(body, argv, execute, help, exit)`: Run the body of a script, given as
+#'   a function or a block of code in braces, or return a function that will.
+#'   `argv` overrides the arguments to parse, `execute` forces the choice
+#'   between running the body (`TRUE`) and returning a function (`FALSE`),
+#'   `help` names the option that requests usage information, and `exit`
+#'   controls whether the R session is ended after help is given or a usage
+#'   error reported. See Details.
 #' 
 #' @note The option and pattern specifications given to this function are
 #'   evaluated with [opt()] and [pat()] in scope, so a script may call
@@ -103,14 +104,14 @@ optDescription <- function (o)
 #' arguments, so that the same script can be driven interactively.
 #' 
 #' The body may take one argument, in which case it receives the parsed
-#' arguments as a list, or none, in which case they are bound in the
-#' environment it runs in and may be referred to by name. Note that such
-#' bindings mask anything of the same name in the enclosing scope, and that a
-#' name the parser could have produced but didn't is bound to `NULL`. A block
-#' of code in braces may also be given in place of a function, and is
-#' equivalent to a function of no arguments. The braces are required: any
-#' other expression is evaluated, and must produce a function, which allows a
-#' body to be built by a factory or taken from a variable.
+#' arguments as a list, conventionally called `opts`, or none, in which case
+#' they are bound in the environment it runs in and may be referred to by name.
+#' Note that such bindings mask anything of the same name in the enclosing
+#' scope, and that a name the parser could have produced but didn't is bound to
+#' `NULL`. A block of code in braces may also be given in place of a function,
+#' and is equivalent to a function of no arguments. The braces are required:
+#' any other expression is evaluated, and must produce a function, which allows
+#' a body to be built by a factory or taken from a variable.
 #' 
 #' @seealso [opt()], [pat()]
 #' 
@@ -127,7 +128,7 @@ optDescription <- function (o)
 #'   # a function, as forced here. The mode is detected automatically by default
 #'   greet <- arrg("greet", opt("n,name","Who to greet",default="world"),
 #'                 patterns=list(pat(.options="n")))
-#'   hello <- greet$run(function () cat("Hello,", name, "\n"), mode="function")
+#'   hello <- greet$run(function () cat("Hello,", name, "\n"), execute=FALSE)
 #'   hello()
 #'   hello(name="reader")
 #'   
@@ -219,8 +220,8 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         return (matches[[which(!failed)[1]]])
     }
     
-    .parse <- function (args = commandArgs(trailingOnly=TRUE)) {
-        nargs <- length(args)
+    .parse <- function (argv = commandArgs(trailingOnly=TRUE)) {
+        argc <- length(argv)
         
         # The options given, keyed by option name, the labels the user actually
         # used for them, and the positional arguments, in the order given
@@ -234,19 +235,19 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         
         i <- 1L
         repeat {
-            if (i > nargs) break
-            type <- tokenType(args[i])
+            if (i > argc) break
+            type <- tokenType(argv[i])
             
-            if (args[i] == "--") {
+            if (argv[i] == "--") {
                 # An explicit end of options: all that follows is positional
-                if (i < nargs)
-                    positional <- c(positional, args[(i+1):nargs])
+                if (i < argc)
+                    positional <- c(positional, argv[(i+1):argc])
                 break
             } else if (type == "long") {
-                m <- ore_search("^--([\\w-]+)(=(.*))?$", args[i])
+                m <- ore_search("^--([\\w-]+)(=(.*))?$", argv[i])
                 index <- if (is.null(m)) NA_integer_ else match(m[,1], .long)
                 if (is.na(index))
-                    stop(es("Unexpected long-style option: #{args[i]}"))
+                    stop(es("Unexpected long-style option: #{argv[i]}"))
                 o <- .opts[[index]]
                 label <- paste0("--", o$long)
                 if (!is.na(m[,2])) {
@@ -255,11 +256,11 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
                         stop(es("Long-style option #{label} does not take an argument"))
                     record(o, label, coerceValue(if (is.na(m[,3])) "" else m[,3], o$mode, paste("option", label)))
                 } else if (o$arg) {
-                    if (i == nargs)
+                    if (i == argc)
                         stop(es("Long-style option #{label} requires an argument"))
-                    else if (tokenType(args[i+1]) != "other")
-                        warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to long-style option #{label}"))
-                    record(o, label, coerceValue(args[i+1], o$mode, paste("option", label)))
+                    else if (tokenType(argv[i+1]) != "other")
+                        warning(es("Flag-like argument #{argv[i+1]} will be taken as a parameter to long-style option #{label}"))
+                    record(o, label, coerceValue(argv[i+1], o$mode, paste("option", label)))
                     i <- i + 1L
                 } else {
                     record(o, label, TRUE)
@@ -268,13 +269,13 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
                 # A short-style argument may be a cluster of several options.
                 # Each is taken in turn, and if one requires an argument then
                 # the remainder of the cluster, if any, provides its value
-                cluster <- strsplit(ore_subst("^-", "", args[i]), "")[[1]]
+                cluster <- strsplit(ore_subst("^-", "", argv[i]), "")[[1]]
                 j <- 1L
                 while (j <= length(cluster)) {
                     index <- match(cluster[j], .short)
                     if (is.na(index)) {
                         # Name the whole argument if it isn't a cluster at all
-                        label <- if (j == 1L) args[i] else paste0("-", cluster[j])
+                        label <- if (j == 1L) argv[i] else paste0("-", cluster[j])
                         stop(es("Unexpected short-style option: #{label}"))
                     }
                     o <- .opts[[index]]
@@ -287,18 +288,18 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
                     rest <- paste(cluster[-seq_len(j)], collapse="")
                     if (nzchar(rest))
                         record(o, label, coerceValue(rest, o$mode, paste("option", label)))
-                    else if (i == nargs)
+                    else if (i == argc)
                         stop(es("Short-style option #{label} requires an argument"))
                     else {
-                        if (tokenType(args[i+1]) != "other")
-                            warning(es("Flag-like argument #{args[i+1]} will be taken as a parameter to short-style option #{label}"))
-                        record(o, label, coerceValue(args[i+1], o$mode, paste("option", label)))
+                        if (tokenType(argv[i+1]) != "other")
+                            warning(es("Flag-like argument #{argv[i+1]} will be taken as a parameter to short-style option #{label}"))
+                        record(o, label, coerceValue(argv[i+1], o$mode, paste("option", label)))
                         i <- i + 1L
                     }
                     break   # The rest of the cluster was the option's value
                 }
             } else {
-                positional <- c(positional, args[i])
+                positional <- c(positional, argv[i])
             }
             
             i <- i + 1L
@@ -431,26 +432,26 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         return (.match(list(options=options, labels=labels, args=character(0))))
     }
     
-    .run <- function (body, args = NULL, mode = c("auto","script","function"),
-                      help = "help", exit = TRUE) {
+    .run <- function (body, argv = NULL, execute = NA, help = "help", exit = TRUE) {
         # The body is captured unevaluated, so that a block of code may be
         # given as well as a function, and so that identifying which it is
         # never runs it
         body <- resolveBody(substitute(body), parent.frame())
-        mode <- match.arg(mode)
-        if (mode == "auto")
-            mode <- if (beingSourced()) "function" else "script"
-        if (mode == "function")
+        if (!is.logical(execute) || length(execute) != 1L)
+            stop("The execute argument must be TRUE, FALSE or NA")
+        if (is.na(execute))
+            execute <- !beingSourced()
+        if (!execute)
             return (.wrapper(body))
         
-        if (is.null(args))
-            args <- scriptArgs()
+        if (is.null(argv))
+            argv <- scriptArgs()
         helpIndex <- if (is.null(help)) NA_integer_ else match(help, .names)
         hint <- if (is.na(helpIndex)) NULL else paste0("Try '", name, " ", .label(helpIndex), "' for more information.")
         
         # A request for help is honoured before the arguments are matched
         # against the patterns, so that it works whatever else was given
-        if (!is.na(helpIndex) && helpRequested(args, .opts[[helpIndex]])) {
+        if (!is.na(helpIndex) && helpRequested(argv, .opts[[helpIndex]])) {
             .show()
             if (exit) quit("no", status=0L)
             return (invisible(NULL))
@@ -458,7 +459,7 @@ arrg <- function (name, ..., patterns = list(), help = TRUE, header = NULL, foot
         
         # A usage error is the user's mistake rather than the script's, so it
         # is reported briefly on stderr instead of as an R error
-        parsed <- tryCatch(.parse(args), error = function (cond) {
+        parsed <- tryCatch(.parse(argv), error = function (cond) {
             message(name, ": ", conditionMessage(cond))
             if (!is.null(hint)) message(hint)
             if (exit) quit("no", status=1L)
